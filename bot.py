@@ -8,6 +8,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
+from handlers.estimate import router as estimate_router
 from handlers.materials import router as materials_router
 from handlers.project import router as project_router
 from handlers.rates import router as rates_router
@@ -25,6 +26,7 @@ dp = Dispatcher(storage=MemoryStorage())
 
 for router in [
     start_router,
+    estimate_router,
     rates_router,
     project_router,
     materials_router,

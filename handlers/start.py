@@ -19,9 +19,10 @@ async def cmd_start(message: Message) -> None:
         f"Проектов в месяц: <b>{limits['projects_per_month_label']}</b>\n"
         f"Вариантов материалов на запрос: <b>{limits['material_options']}</b>\n\n"
         "Команды:\n"
+        "/estimate — 🔥 описать ситуацию клиента → смета + 3 варианта материалов\n"
         "/project — создать или посмотреть проект\n"
-        "/rates — получить ориентир по расценкам\n"
-        "/materials — подобрать материалы\n"
+        "/rates — ориентиры по расценкам\n"
+        "/materials — подобрать материалы из базы\n"
         "/subscribe — статус подписки\n"
         "/voice — голосовой режим (заготовка)"
     )
