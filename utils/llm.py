@@ -51,9 +51,20 @@ SYSTEM_PROMPT = """
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 HTTPX_TIMEOUT = httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=5.0)
 RETRY_DELAYS = [2, 5, 10]
-MAX_RATE_LIMIT_WAIT = 20  # ждём не больше N секунд на rate limit, иначе переходим к следующей модели
+MAX_RATE_LIMIT_WAIT = 20
+
+# Модели-не чат: модерация, эмбеддинги и пр.
+_BLOCKLIST_KEYWORDS = [
+    "content-safety", "moderation", "guard", "embedding",
+    "rerank", "classify", "whisper", "tts", "vision",
+]
 
 _free_models_cache: list[str] = []
+
+
+def _is_chat_model(model_id: str) -> bool:
+    mid = model_id.lower()
+    return not any(kw in mid for kw in _BLOCKLIST_KEYWORDS)
 
 
 async def fetch_free_models(api_key: str) -> list[str]:
@@ -68,15 +79,16 @@ async def fetch_free_models(api_key: str) -> list[str]:
             )
             resp.raise_for_status()
             data = resp.json()
+
         free = [
             m["id"] for m in data.get("data", [])
-            if m["id"].endswith(":free")
-            or str(m.get("pricing", {}).get("prompt", "1")) == "0"
+            if (m["id"].endswith(":free") or str(m.get("pricing", {}).get("prompt", "1")) == "0")
+            and _is_chat_model(m["id"])
         ]
-        priority = ["llama", "gemma", "qwen", "nemotron", "hermes"]
+        priority = ["llama", "gemma", "qwen", "nemotron", "hermes", "mistral"]
         free.sort(key=lambda mid: next((i for i, kw in enumerate(priority) if kw in mid), len(priority)))
         _free_models_cache = free[:8]
-        logger.info("Loaded %d free models: %s", len(_free_models_cache), _free_models_cache)
+        logger.info("Loaded %d free chat models: %s", len(_free_models_cache), _free_models_cache)
         return _free_models_cache
     except Exception:
         logger.warning("Could not fetch models list", exc_info=True)
@@ -124,11 +136,13 @@ def _clean_json(raw: str) -> str:
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1]
         raw = raw.rsplit("```", 1)[0]
+    # Убираем <think>...</think> блоки (DeepSeek, o1-style)
+    import re
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
     return raw.strip()
 
 
 def _parse_retry_after(exc: RateLimitError) -> float:
-    """Extract retry_after_seconds from OpenRouter 429 response."""
     try:
         body = exc.response.json()
         return float(body["error"]["metadata"]["retry_after_seconds"])
@@ -177,7 +191,7 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                     logger.warning("Rate limited on %s, waiting %.0fs...", model, wait)
                     await asyncio.sleep(wait)
                 else:
-                    logger.warning("Rate limit too long (%.0fs) on %s — trying next model", wait, model)
+                    logger.warning("Rate limit too long (%.0fs) on %s — trying next", wait, model)
                     last_exc = exc
                     break
 
@@ -190,13 +204,9 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                     logger.warning("All retries failed for %s", model)
                     break
 
-            except json.JSONDecodeError as exc:
-                logger.warning("Bad JSON from %s", model)
-                last_exc = exc
+            except json.JSONDecodeError:
+                # Модель не вернула JSON — пробуем следующую, без шума
+                logger.warning("Bad JSON from %s, trying next model", model)
                 break
 
-    if isinstance(last_exc, (APITimeoutError, APIConnectionError)):
-        raise TimeoutError("Все модели недоступны")
-    if isinstance(last_exc, json.JSONDecodeError):
-        raise ValueError("Некорректный ответ")
     raise RuntimeError("Ни одна модель не ответила")

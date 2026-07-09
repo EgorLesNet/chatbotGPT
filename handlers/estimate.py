@@ -114,7 +114,7 @@ async def step_situation(message: Message, state: FSMContext) -> None:
     await state.clear()
     wait_msg = await message.answer(
         "⏳ Анализирую ситуацию и подбираю варианты...\n"
-        "<i>(обычно 10–30 секунд, зависит от нагрузки нейросети)</i>"
+        "<i>(обычно 10–60 секунд)</i>"
     )
     await message.bot.send_chat_action(message.chat.id, "typing")
 
@@ -124,23 +124,9 @@ async def step_situation(message: Message, state: FSMContext) -> None:
         await wait_msg.delete()
         await message.answer(text)
 
-    except TimeoutError:
-        await wait_msg.delete()
-        await message.answer(
-            "⏰ <b>Нейросеть не ответила</b> — сервер перегружен.\n\n"
-            "Попробуй ещё раз через несколько секунд.\n"
-            "Если ошибка повторяется — попробуй другую модель в .env:\n"
-            "<code>OPENROUTER_MODEL=google/gemma-3-12b-it:free</code>"
-        )
-    except ValueError:
-        await wait_msg.delete()
-        await message.answer(
-            "⚠️ Модель вернула некорректный ответ. Попробуй ещё раз или смени модель:\n"
-            "<code>OPENROUTER_MODEL=google/gemma-3-12b-it:free</code>"
-        )
     except Exception:
-        logger.exception("Estimate failed unexpectedly")
+        logger.exception("Estimate failed")
         await wait_msg.delete()
         await message.answer(
-            "❌ Не удалось получить оценку. Проверь /status или попробуй позже."
+            "⏳ Нейросеть сейчас перегружена. Попробуй ещё раз через несколько секунд."
         )
