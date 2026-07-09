@@ -2,11 +2,13 @@ import os
 import json
 import logging
 from openai import AsyncOpenAI
+from utils.search import search_material_prices
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
 Ты — опытный помощник прораба. Твоя задача — по описанию ситуации клиента дать чёткую профессиональную оценку.
+Если предоставлены актуальные данные из интернета — используй их для уточнения цен.
 
 Формат ответа СТРОГО в JSON (no markdown blocks):
 {
@@ -70,7 +72,7 @@ def _get_client() -> AsyncOpenAI:
     )
 
 
-def _build_user_message(situation: str, project: dict | None) -> str:
+def _build_user_message(situation: str, project: dict | None, web_context: str) -> str:
     parts = [f"Ситуация клиента: {situation}"]
     if project:
         parts.append(f"Объект: {project.get('title', '')}")
@@ -78,11 +80,12 @@ def _build_user_message(situation: str, project: dict | None) -> str:
         parts.append(f"Площадь: {project.get('area_m2', '')} м²")
         if project.get("notes"):
             parts.append(f"Доп. заметки: {project['notes']}")
+    if web_context:
+        parts.append(f"\nАктуальные данные из интернета (2026):\n{web_context}")
     return "\n".join(parts)
 
 
 def _clean_json(raw: str) -> str:
-    """Strip markdown fences if model returns them despite instructions."""
     raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1]
@@ -93,7 +96,11 @@ def _clean_json(raw: str) -> str:
 async def get_estimate(situation: str, project: dict | None = None) -> dict:
     client = _get_client()
     model = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
-    user_msg = _build_user_message(situation, project)
+
+    # Параллельно подтягиваем актуальные цены из интернета
+    web_context = await search_material_prices(situation)
+
+    user_msg = _build_user_message(situation, project, web_context)
 
     response = await client.chat.completions.create(
         model=model,
