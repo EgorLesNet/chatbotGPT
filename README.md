@@ -7,7 +7,7 @@
 `/estimate` — прораб описывает что хочет клиент (стиль, бюджет, цвет, тип работ), нейросеть возвращает:
 - Краткое описание работ
 - Примерную стоимость (мин–макс)
-- **3 варианта материалов**: Эконом / Оптимальный / Премиум — каждый со своими материалами, плюсами и минусами
+- **3 варианта материалов**: Эконом / Оптимальный / Премиум
 - Риски и нюансы для прораба
 
 Free-план показывает 1 вариант, paid-план — все 3.
@@ -16,23 +16,25 @@ Free-план показывает 1 вариант, paid-план — все 3.
 
 ```
 chatbotGPT/
-├── bot.py                   # точка входа, aiogram 3 + FSM
+├── bot.py
+├── Dockerfile
+├── fly.toml
 ├── handlers/
-│   ├── start.py             # /start, /status, /menu
-│   ├── estimate.py          # /estimate — главная фича: ситуация → смета + материалы
-│   ├── project.py           # /project, /newproject — FSM создания проекта
-│   ├── rates.py             # /rates — ориентиры по расценкам
-│   ├── materials.py         # /materials — подбор из локальной базы
-│   ├── subscribe.py         # /subscribe — статус подписки
-│   └── voice.py             # /voice — заготовка под voice-flow
+│   ├── estimate.py   # /estimate — ситуация → смета + материалы
+│   ├── project.py    # /project, /newproject — FSM
+│   ├── start.py
+│   ├── rates.py
+│   ├── materials.py
+│   ├── subscribe.py
+│   └── voice.py
 ├── utils/
-│   ├── storage.py           # локальное JSON-хранилище пользователей и проектов
-│   ├── subscription.py      # логика free/paid через paid_until
-│   ├── llm.py               # промпт + вызов OpenAI, возвращает JSON-смету
-│   └── pdf.py               # заготовка PDF-экспорта
+│   ├── llm.py         # OpenRouter API
+│   ├── storage.py
+│   ├── subscription.py
+│   └── pdf.py
 ├── db/
-│   ├── users/               # файлы пользователей {user_id}.json
-│   └── materials.json       # локальная база материалов
+│   ├── users/         # персистентный диск fly.io
+│   └── materials.json
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -44,33 +46,44 @@ chatbotGPT/
 |---|---|---|
 | Проектов в месяц | 1 | безлимит |
 | Вариантов материалов | 1 | 3 |
-| /estimate | ✅ | ✅ |
-| Привязка к проекту | ✅ | ✅ |
 
-Активность paid определяется полем `paid_until` в карточке пользователя.
-
-## Команды
-
-- `/start` — стартовое меню
-- `/estimate` — 🔥 главная фича: описать ситуацию → смета + материалы
-- `/project` — список проектов или создать новый
-- `/newproject` — создать проект (FSM, 4 шага)
-- `/rates` — ориентиры по расценкам
-- `/materials` — подбор материалов из локальной базы
-- `/subscribe` — статус подписки
-- `/voice` — голосовой режим (заготовка)
-
-## Запуск
+## Деплой на fly.io
 
 ```bash
-pip install -r requirements.txt
-cp .env.example .env   # вписать BOT_TOKEN и OPENAI_API_KEY
-python bot.py
+# 1. Установи flyctl
+curl -L https://fly.io/install.sh | sh
+
+# 2. Авторизация
+fly auth login
+
+# 3. Создай приложение (из папки проекта)
+fly launch --no-deploy
+
+# 4. Создай персистентный диск
+fly volumes create prorab_db --region ams --size 1
+
+# 5. Добавь секреты
+fly secrets set BOT_TOKEN=your_token
+fly secrets set OPENROUTER_API_KEY=sk-or-v1-...
+
+# 6. Деплой
+fly deploy
 ```
 
-## Следующие шаги
+## Полезные команды fly
 
-- Подключить оплату и автопродление `paid_until` через вебхук
-- Реализовать voice → STT → /estimate
-- PDF-экспорт сметы через /pdf
-- FSM-редактирование существующих проектов
+```bash
+fly logs          # смотреть логи в реальном времени
+fly status        # статус машины
+fly deploy        # обновить бот
+fly secrets list  # список секретов
+```
+
+## Команды бота
+
+- `/start` — стартовое меню
+- `/estimate` — главная фича: ситуация → смета + материалы
+- `/project` / `/newproject` — управление проектами
+- `/rates` — ориентиры по расценкам
+- `/materials` — подбор из базы
+- `/subscribe` — статус подписки
