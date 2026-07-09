@@ -5,6 +5,7 @@ import os
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 from handlers.materials import router as materials_router
@@ -20,7 +21,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
 for router in [
     start_router,
@@ -40,13 +41,11 @@ async def healthcheck(_: web.Request) -> web.Response:
 async def main() -> None:
     app = web.Application()
     app.router.add_get("/health", healthcheck)
-
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", WEBHOOK_PORT)
     await site.start()
     logging.info("Healthcheck server listening on port %s", WEBHOOK_PORT)
-
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
