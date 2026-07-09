@@ -1,108 +1,49 @@
-# 🤖 TG AI Bot с подпиской через Tribute
+# Прораб-Бот
 
-Telegram-бот с ИИ на базе бесплатных моделей [OpenRouter](https://openrouter.ai).
-Подписочная модель реализована через [Tribute](https://tribute.tg) webhook API.
+Телеграм-бот для прораба и небольших строительных команд. Архитектура переведена с общего AI-чата на сценарии вокруг проектов, расценок и подбора материалов.
 
-## Как это работает
+## Структура
 
-```
-Пользователь покупает продукт в Tribute
-        ↓
-Tribute отправляет POST /tribute на твой сервер
-        ↓
-Бот получает telegram_id покупателя
-        ↓
-В базе ставится subscribed=True + дата истечения
-        ↓
-Пользователь получает уведомление и безлимитный доступ
-```
+- `bot.py` — новая точка входа на aiogram 3.
+- `handlers/start.py` — старт, статус, меню.
+- `handlers/rates.py` — ориентиры по расценкам.
+- `handlers/project.py` — проекты и месячные лимиты.
+- `handlers/materials.py` — подбор материалов из локальной базы.
+- `handlers/subscribe.py` — статус подписки и описание планов.
+- `handlers/voice.py` — заготовка под voice-flow.
+- `utils/storage.py` — локальное JSON-хранилище пользователей и проектов.
+- `utils/subscription.py` — логика free/paid через `paid_until`.
+- `utils/llm.py` — заготовка промптов под прорабский сценарий.
+- `utils/pdf.py` — заготовка под PDF-экспорт.
+- `db/users/` — локальные файлы пользователей.
+- `db/materials.json` — база материалов.
 
-## Возможности
-- 🆓 20 бесплатных сообщений в день
-- 💎 Безлимит для подписчиков Tribute
-- 🔄 Автосброс счётчика каждую ночь
-- 🧠 Контекст диалога (последние 10 сообщений)
-- ⚡ Fallback по нескольким бесплатным моделям
+## Тарифы
+
+- Free: 1 проект в месяц, 1 вариант материалов на запрос.
+- Paid: безлимит по проектам, 3 варианта материалов на запрос.
+- Активность paid определяется полем `paid_until` в карточке пользователя.
 
 ## Команды
-| Команда | Описание |
-|---------|----------|
-| `/start` | Приветствие |
-| `/reset` | Очистить историю диалога |
-| `/status` | Статус подписки и лимит |
 
-## Установка на macOS 10.13+
+- `/start` — стартовое меню.
+- `/status` и `/menu` — статус и краткая сводка.
+- `/project` — создать стартовый проект или показать последние проекты.
+- `/rates` — показать ориентиры по расценкам.
+- `/materials` — подобрать материалы из локальной базы.
+- `/subscribe` — показать статус подписки.
+- `/voice` — показать состояние voice-заготовки.
 
-> ⚠️ Нужен Python 3.10+. Установи через `brew install python@3.10`
+## Запуск
 
-```bash
-git clone https://github.com/EgorLesNet/chatbotGPT.git
-cd chatbotGPT
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-nano .env  # заполни все переменные
-python3 main.py
-```
+1. Создай и активируй виртуальное окружение.
+2. Установи зависимости: `pip install -r requirements.txt`
+3. Скопируй `.env.example` в `.env` и заполни `BOT_TOKEN`.
+4. Запусти: `python bot.py`
 
-## Настройка Tribute Webhook
+## Следующие шаги
 
-1. Зайди в [@tribute](https://t.me/tribute) → **Дэшборд автора** → **Настройки (⋮)** → **API-ключи**
-2. Сгенерируй API-ключ → скопируй в `TRIBUTE_API_KEY`
-3. В поле **Webhook URL** укажи: `https://твой_домен/tribute`
-4. Tribute будет слать POST-запросы на этот URL при каждой покупке/продлении/отмене
-
-### Как пробросить порт для локального запуска (macOS)
-Используй [ngrok](https://ngrok.com) для теста:
-```bash
-brew install ngrok
-ngrok http 8080
-# Скопируй https://xxxx.ngrok.io → укажи как https://xxxx.ngrok.io/tribute в Tribute
-```
-
-## Поддерживаемые события Tribute
-| Событие | Действие |
-|---------|----------|
-| `newSubscription` | Активировать подписку на 30 дней |
-| `renewedSubscription` | Продлить подписку на 30 дней |
-| `cancelledSubscription` | Деактивировать подписку |
-
-## Переменные окружения
-См. [`.env.example`](.env.example)
-
-## Автозапуск через launchd (macOS)
-Создай `~/Library/LaunchAgents/com.tgaibot.plist`:
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key><string>com.tgaibot</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/path/to/chatbotGPT/venv/bin/python3</string>
-        <string>/path/to/chatbotGPT/main.py</string>
-    </array>
-    <key>WorkingDirectory</key><string>/path/to/chatbotGPT</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>BOT_TOKEN</key><string>TOKEN</string>
-        <key>OPENROUTER_API_KEY</key><string>KEY</string>
-        <key>TRIBUTE_API_KEY</key><string>KEY</string>
-    </dict>
-    <key>RunAtLoad</key><true/>
-    <key>KeepAlive</key><true/>
-    <key>StandardOutPath</key><string>/tmp/tgaibot.log</string>
-    <key>StandardErrorPath</key><string>/tmp/tgaibot.err</string>
-</dict>
-</plist>
-```
-```bash
-launchctl load ~/Library/LaunchAgents/com.tgaibot.plist
-```
-
-## Получить ключи
-- **BOT_TOKEN** → [@BotFather](https://t.me/BotFather)
-- **OPENROUTER_API_KEY** → [openrouter.ai/keys](https://openrouter.ai/keys)
-- **TRIBUTE_API_KEY** → [@tribute](https://t.me/tribute) → Дэшборд → Настройки → API-ключи
+- Добавить FSM-сценарий создания проекта.
+- Подключить реальный LLM-провайдер в `utils/llm.py`.
+- Реализовать оплату и продление `paid_until` через вебхук.
+- Добавить voice-to-text и генерацию PDF.
