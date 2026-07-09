@@ -9,6 +9,7 @@ from utils.materials_db import get_materials_context
 
 logger = logging.getLogger(__name__)
 
+# Полный промпт для облачных моделей
 SYSTEM_PROMPT = """
 Ты — опытный помощник прораба. Твоя задача — по описанию ситуации клиента дать чёткую профессиональную оценку.
 Если предоставлены данные о материалах — используй их для точных цен в смете.
@@ -44,19 +45,24 @@ SYSTEM_PROMPT = """
   ],
   "risks": "Что важно учесть прорабу"
 }
-Правила:
-- Цены реалистичные для России, учитывай площадь
-- Возвращай ONLY raw JSON, no markdown fences
-"""
+Правила: цены реалистичные для России, учитывай площадь. ONLY raw JSON.
+""".strip()
+
+# Укороченный промпт для локальных моделей (меньше токенов → быстрее)
+SYSTEM_PROMPT_LOCAL = """
+Прораб Руссия. Оцени ремонт. Ответ строго в JSON:
+{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":[{"name":"Эконом","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},{"name":"Оптимальный","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},{"name":"Премиум","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""}],"risks":""}
+Цены в рублях, актуальные для России. ONLY raw JSON, no text before or after.
+""".strip()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-# llama.cpp server: задаётся через .env
-# LLAMACPP_URL=http://localhost:11434  (по умолчанию)
-# LLAMACPP_MODEL=Qwen2.5-7B-Instruct-Q4_K_M  (имя модели для API, можно любое)
 LLAMACPP_DEFAULT_URL = "http://localhost:11434"
 
-HTTPX_TIMEOUT = httpx.Timeout(connect=5.0, read=180.0, write=15.0, pool=5.0)
-RETRY_DELAYS = [2, 5, 15]
+# Таймауты: отдельно для локальных и облачных
+HTTPX_TIMEOUT_LOCAL = httpx.Timeout(connect=5.0, read=600.0, write=15.0, pool=5.0)
+HTTPX_TIMEOUT_CLOUD = httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=5.0)
+
+RETRY_DELAYS = [3, 10]
 MAX_RATE_LIMIT_WAIT = 30
 JSON_MAX_RETRIES = 2
 
@@ -69,15 +75,10 @@ _free_models_cache: list[str] = []
 
 
 def _is_chat_model(model_id: str) -> bool:
-    mid = model_id.lower()
-    return not any(kw in mid for kw in _BLOCKLIST_KEYWORDS)
+    return not any(kw in model_id.lower() for kw in _BLOCKLIST_KEYWORDS)
 
 
 async def _check_llamacpp() -> tuple[str, str] | None:
-    """
-    Проверяет доступность llama.cpp сервера через /health.
-    Возвращает (model_name, base_url) или None.
-    """
     base_url = os.getenv("LLAMACPP_URL", LLAMACPP_DEFAULT_URL).rstrip("/")
     model_name = os.getenv("LLAMACPP_MODEL", "local-model")
     try:
@@ -88,7 +89,6 @@ async def _check_llamacpp() -> tuple[str, str] | None:
                 return model_name, f"{base_url}/v1"
     except Exception:
         pass
-    logger.info("llama.cpp server not available at %s", base_url)
     return None
 
 
@@ -119,14 +119,18 @@ async def fetch_free_models(api_key: str) -> list[str]:
         return []
 
 
+def _is_local(base_url: str) -> bool:
+    return "localhost" in base_url or "127.0.0.1" in base_url
+
+
 def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
-    is_local = "localhost" in base_url or "127.0.0.1" in base_url
+    local = _is_local(base_url)
     return AsyncOpenAI(
-        api_key="local" if is_local else api_key,
+        api_key="local" if local else api_key,
         base_url=base_url,
-        timeout=HTTPX_TIMEOUT,
+        timeout=HTTPX_TIMEOUT_LOCAL if local else HTTPX_TIMEOUT_CLOUD,
         max_retries=0,
-        default_headers={} if is_local else {
+        default_headers={} if local else {
             "HTTP-Referer": os.getenv("APP_URL", "https://github.com/EgorLesNet/chatbotGPT"),
             "X-Title": "ProrabBot",
         },
@@ -135,36 +139,26 @@ def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
 
 async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
     chain: list[tuple[str, str]] = []
-
-    # 1. Локальный llama.cpp
     local = await _check_llamacpp()
     if local:
         chain.append(local)
-
-    # 2. Явно указанная модель в .env
     primary = os.getenv("OPENROUTER_MODEL", "").strip()
     if primary:
         chain.append((primary, OPENROUTER_BASE_URL))
-
-    # 3. Автоподбор из OpenRouter
-    free_models = await fetch_free_models(api_key)
-    for m in free_models:
+    for m in await fetch_free_models(api_key):
         if not any(m == c[0] for c in chain):
             chain.append((m, OPENROUTER_BASE_URL))
-
     return chain
 
 
 def _build_user_message(situation: str, project: dict | None, materials_context: str) -> str:
-    parts = [f"Ситуация клиента: {situation}"]
+    parts = [f"Ситуация: {situation}"]
     if project:
-        parts.append(f"Объект: {project.get('title', '')}")
-        parts.append(f"Тип: {project.get('project_type', '')}")
-        parts.append(f"Площадь: {project.get('area_m2', '')} м²")
+        parts.append(f"Объект: {project.get('title', '')}, тип: {project.get('project_type', '')}, {project.get('area_m2', '')} м²")
         if project.get("notes"):
-            parts.append(f"Доп. заметки: {project['notes']}")
+            parts.append(f"Заметки: {project['notes']}")
     if materials_context:
-        parts.append(f"\n{materials_context}")
+        parts.append(materials_context)
     return "\n".join(parts)
 
 
@@ -172,8 +166,7 @@ def _clean_json(raw: str) -> str:
     raw = raw.strip()
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
     if raw.startswith("```"):
-        raw = raw.split("\n", 1)[-1]
-        raw = raw.rsplit("```", 1)[0]
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]
     brace = raw.find("{")
     if brace > 0:
         raw = raw[brace:]
@@ -182,15 +175,14 @@ def _clean_json(raw: str) -> str:
 
 def _parse_retry_after(exc: RateLimitError) -> float:
     try:
-        body = exc.response.json()
-        return float(body["error"]["metadata"]["retry_after_seconds"])
+        return float(exc.response.json()["error"]["metadata"]["retry_after_seconds"])
     except Exception:
         return 15.0
 
 
-async def _try_model(client: AsyncOpenAI, model: str, messages: list) -> dict:
+async def _try_model(client: AsyncOpenAI, model: str, messages: list, max_tokens: int) -> dict:
     response = await client.chat.completions.create(
-        model=model, messages=messages, temperature=0.4, max_tokens=1800,
+        model=model, messages=messages, temperature=0.4, max_tokens=max_tokens,
     )
     raw = response.choices[0].message.content
     return json.loads(_clean_json(raw))
@@ -202,19 +194,22 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
 
     materials_context = await get_materials_context(situation, limit=3)
     user_msg = _build_user_message(situation, project, materials_context)
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_msg},
-    ]
 
     for model, base_url in model_chain:
+        local = _is_local(base_url)
+        system_prompt = SYSTEM_PROMPT_LOCAL if local else SYSTEM_PROMPT
+        max_tokens = 800 if local else 1800
         client = _make_client(base_url, api_key)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ]
         json_attempts = 0
 
         for attempt, delay in enumerate(RETRY_DELAYS, start=1):
             try:
-                result = await _try_model(client, model, messages)
-                logger.info("Estimate OK via %s", model)
+                result = await _try_model(client, model, messages, max_tokens)
+                logger.info("Estimate OK via %s (%s)", model, "local" if local else "cloud")
                 return result
 
             except NotFoundError:
