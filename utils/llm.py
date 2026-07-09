@@ -1,7 +1,9 @@
 import os
 import json
 import logging
-from openai import AsyncOpenAI
+import asyncio
+import httpx
+from openai import AsyncOpenAI, APITimeoutError, APIConnectionError
 from utils.materials_db import get_materials_context
 
 logger = logging.getLogger(__name__)
@@ -60,11 +62,23 @@ SYSTEM_PROMPT = """
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Настройки таймаутов (httpx)
+HTTPX_TIMEOUT = httpx.Timeout(
+    connect=15.0,   # время на установку TCP-соединения
+    read=90.0,      # ожидание ответа LLM (фри модели медленные)
+    write=15.0,
+    pool=5.0,
+)
+MAX_RETRIES = 3
+RETRY_DELAYS = [2, 5, 10]  # секунды между попыткам
+
 
 def _get_client() -> AsyncOpenAI:
     return AsyncOpenAI(
         api_key=os.getenv("OPENROUTER_API_KEY"),
         base_url=OPENROUTER_BASE_URL,
+        timeout=HTTPX_TIMEOUT,
+        max_retries=0,  # ретрай делаем сами с нужными задержками
         default_headers={
             "HTTP-Referer": os.getenv("APP_URL", "https://github.com/EgorLesNet/chatbotGPT"),
             "X-Title": "ProrabBot",
@@ -97,20 +111,39 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
     client = _get_client()
     model = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
 
-    # Шаг 1: база → фоллбек в интернет
     materials_context = await get_materials_context(situation, limit=3)
-
-    # Шаг 2: LLM с контекстом
     user_msg = _build_user_message(situation, project, materials_context)
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_msg},
+    ]
 
-    response = await client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg},
-        ],
-        temperature=0.4,
-        max_tokens=1800,
-    )
-    raw = response.choices[0].message.content
-    return json.loads(_clean_json(raw))
+    last_exc: Exception | None = None
+    for attempt, delay in enumerate(RETRY_DELAYS, start=1):
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.4,
+                max_tokens=1800,
+            )
+            raw = response.choices[0].message.content
+            return json.loads(_clean_json(raw))
+
+        except (APITimeoutError, APIConnectionError) as exc:
+            last_exc = exc
+            if attempt <= MAX_RETRIES - 1:
+                logger.warning(
+                    "OpenRouter timeout/connection error (attempt %d/%d), retrying in %ds...",
+                    attempt, MAX_RETRIES, delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error("All %d attempts failed: %s", MAX_RETRIES, exc)
+                raise TimeoutError("Нейросеть не отвечает") from exc
+
+        except json.JSONDecodeError as exc:
+            logger.error("LLM returned invalid JSON: %s", exc)
+            raise ValueError("Некорректный формат ответа") from exc
+
+    raise last_exc  # не достижимо, но для тайпчека
