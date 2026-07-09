@@ -3,7 +3,7 @@ import json
 import logging
 import asyncio
 import httpx
-from openai import AsyncOpenAI, APITimeoutError, APIConnectionError, NotFoundError
+from openai import AsyncOpenAI, APITimeoutError, APIConnectionError, NotFoundError, RateLimitError
 from utils.materials_db import get_materials_context
 
 logger = logging.getLogger(__name__)
@@ -23,57 +23,43 @@ SYSTEM_PROMPT = """
       "name": "Эконом",
       "budget": "50 000 – 60 000 ₽",
       "style": "Простой и практичный",
-      "materials": [
-        {"name": "Название", "price": "цена/ед.", "note": "пояснение"}
-      ],
-      "pros": "Плюсы",
-      "cons": "Минусы"
+      "materials": [{"name": "Название", "price": "цена/ед.", "note": "пояснение"}],
+      "pros": "Плюсы", "cons": "Минусы"
     },
     {
       "name": "Оптимальный",
       "budget": "65 000 – 75 000 ₽",
       "style": "Современный минимализм",
-      "materials": [
-        {"name": "Название", "price": "цена/ед.", "note": "пояснение"}
-      ],
-      "pros": "Плюсы",
-      "cons": "Минусы"
+      "materials": [{"name": "Название", "price": "цена/ед.", "note": "пояснение"}],
+      "pros": "Плюсы", "cons": "Минусы"
     },
     {
       "name": "Премиум",
       "budget": "75 000 – 90 000 ₽",
       "style": "Дизайнерский",
-      "materials": [
-        {"name": "Название", "price": "цена/ед.", "note": "пояснение"}
-      ],
-      "pros": "Плюсы",
-      "cons": "Минусы"
+      "materials": [{"name": "Название", "price": "цена/ед.", "note": "пояснение"}],
+      "pros": "Плюсы", "cons": "Минусы"
     }
   ],
   "risks": "Что важно учесть прорабу"
 }
 Правила:
-- Учитывай площадь, цены реалистичные для России
+- Цены реалистичные для России, учитывай площадь
 - Возвращай ONLY raw JSON, no markdown fences
 """
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 HTTPX_TIMEOUT = httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=5.0)
 RETRY_DELAYS = [2, 5, 10]
+MAX_RATE_LIMIT_WAIT = 20  # ждём не больше N секунд на rate limit, иначе переходим к следующей модели
 
-# Кэш бесплатных моделей, заполняется при старте
 _free_models_cache: list[str] = []
 
 
 async def fetch_free_models(api_key: str) -> list[str]:
-    """
-    Получает список доступных бесплатных моделей прямо из API OpenRouter.
-    Бесплатные модели имеют pricing.prompt == "0" или id оканчивается на :free
-    """
     global _free_models_cache
     if _free_models_cache:
         return _free_models_cache
-
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
@@ -82,27 +68,18 @@ async def fetch_free_models(api_key: str) -> list[str]:
             )
             resp.raise_for_status()
             data = resp.json()
-
         free = [
             m["id"] for m in data.get("data", [])
             if m["id"].endswith(":free")
             or str(m.get("pricing", {}).get("prompt", "1")) == "0"
         ]
-        # Предпочитаем популярные (llama, gemma, qwen)
         priority = ["llama", "gemma", "qwen", "nemotron", "hermes"]
-        def score(mid: str) -> int:
-            for i, kw in enumerate(priority):
-                if kw in mid:
-                    return i
-            return len(priority)
-        free.sort(key=score)
-
-        _free_models_cache = free[:8]  # берём топ-8
-        logger.info("Loaded %d free models from OpenRouter: %s", len(_free_models_cache), _free_models_cache)
+        free.sort(key=lambda mid: next((i for i, kw in enumerate(priority) if kw in mid), len(priority)))
+        _free_models_cache = free[:8]
+        logger.info("Loaded %d free models: %s", len(_free_models_cache), _free_models_cache)
         return _free_models_cache
-
     except Exception:
-        logger.warning("Could not fetch models list, using built-in fallback", exc_info=True)
+        logger.warning("Could not fetch models list", exc_info=True)
         return ["openrouter/auto"]
 
 
@@ -120,7 +97,7 @@ def _get_client() -> AsyncOpenAI:
 
 
 async def _get_model_chain(api_key: str) -> list[str]:
-    primary = os.getenv("OPENROUTER_MODEL", "")
+    primary = os.getenv("OPENROUTER_MODEL", "").strip()
     free_models = await fetch_free_models(api_key)
     if primary and primary not in free_models:
         return [primary] + free_models
@@ -148,6 +125,15 @@ def _clean_json(raw: str) -> str:
         raw = raw.split("\n", 1)[-1]
         raw = raw.rsplit("```", 1)[0]
     return raw.strip()
+
+
+def _parse_retry_after(exc: RateLimitError) -> float:
+    """Extract retry_after_seconds from OpenRouter 429 response."""
+    try:
+        body = exc.response.json()
+        return float(body["error"]["metadata"]["retry_after_seconds"])
+    except Exception:
+        return 15.0
 
 
 async def _try_model(client: AsyncOpenAI, model: str, messages: list) -> dict:
@@ -181,9 +167,19 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 return result
 
             except NotFoundError:
-                logger.warning("Model not available: %s — skipping", model)
-                _free_models_cache.clear()  # сбросить кэш чтобы перечитать
+                logger.warning("Model not found: %s — skipping", model)
+                _free_models_cache.clear()
                 break
+
+            except RateLimitError as exc:
+                wait = _parse_retry_after(exc)
+                if wait <= MAX_RATE_LIMIT_WAIT and attempt < len(RETRY_DELAYS):
+                    logger.warning("Rate limited on %s, waiting %.0fs...", model, wait)
+                    await asyncio.sleep(wait)
+                else:
+                    logger.warning("Rate limit too long (%.0fs) on %s — trying next model", wait, model)
+                    last_exc = exc
+                    break
 
             except (APITimeoutError, APIConnectionError) as exc:
                 last_exc = exc
