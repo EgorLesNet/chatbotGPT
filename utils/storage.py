@@ -113,9 +113,20 @@ def get_user_summary(user_id: int) -> dict:
     }
 
 
+def _load_materials() -> list[dict]:
+    """Load materials list from db/materials.json.
+    Supports both old format (plain list) and new format ({meta, items}).
+    """
+    raw = _read_json(MATERIALS_FILE, [])
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        return raw.get("items", [])
+    return []
+
+
 def suggest_materials(limit: int = 1) -> list[dict]:
-    materials = _read_json(MATERIALS_FILE, [])
-    return materials[:limit]
+    return _load_materials()[:limit]
 
 
 def list_rate_presets() -> list[dict]:
