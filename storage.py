@@ -1,4 +1,4 @@
-"""Простое JSON-хранилище пользователей с ежедневным сбросом счётчика."""
+"""JSON-хранилище пользователей с ежедневным сбросом счётчика."""
 import json
 import os
 from datetime import date
@@ -26,12 +26,16 @@ def get_user(user_id: int) -> dict:
     uid = str(user_id)
     today = str(date.today())
     user = data.get(uid, {})
-
-    # Сбрасываем счётчик, если новый день
     if user.get("date") != today:
         user["date"] = today
         user["daily_count"] = 0
-
+    # Проверяем, не истекла ли подписка
+    expires = user.get("subscription_expires")
+    if expires and expires < today:
+        user["subscribed"] = False
+        user["subscription_expires"] = None
+        data[uid] = user
+        _save(data)
     return user
 
 
@@ -40,13 +44,21 @@ def increment_messages(user_id: int, history: list):
     uid = str(user_id)
     today = str(date.today())
     user = data.get(uid, {})
-
     if user.get("date") != today:
         user["date"] = today
         user["daily_count"] = 0
-
     user["daily_count"] = user.get("daily_count", 0) + 1
     user["history"] = history
+    data[uid] = user
+    _save(data)
+
+
+def set_subscription(user_id: int, subscribed: bool, expires: str | None):
+    data = _load()
+    uid = str(user_id)
+    user = data.get(uid, {})
+    user["subscribed"] = subscribed
+    user["subscription_expires"] = expires
     data[uid] = user
     _save(data)
 

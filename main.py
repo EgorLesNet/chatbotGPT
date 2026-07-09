@@ -7,42 +7,32 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
+from aiohttp import web
 
 from ai_client import ask_ai
 from storage import get_user, increment_messages, reset_history_for_user
+from tribute_webhook import handle_tribute_webhook
 
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-TRIBUTE_CHANNEL = os.getenv("TRIBUTE_CHANNEL", "")  # username канала Tribute, например @mychannel
-DAILY_FREE_LIMIT = 20
+DAILY_FREE_LIMIT = int(os.getenv("DAILY_FREE_LIMIT", "20"))
+WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 
-async def is_subscriber(user_id: int) -> bool:
-    """Проверяет, состоит ли пользователь в Tribute-канале (платная подписка)."""
-    if not TRIBUTE_CHANNEL:
-        return False
-    try:
-        member = await bot.get_chat_member(chat_id=TRIBUTE_CHANNEL, user_id=user_id)
-        return member.status in ("member", "administrator", "creator")
-    except Exception:
-        return False
-
-
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     reset_history_for_user(message.from_user.id)
-    tribute_text = f"\n💎 Безлимитный доступ — подписка Tribute: {TRIBUTE_CHANNEL}" if TRIBUTE_CHANNEL else ""
     await message.answer(
         "👋 Привет! Я ИИ-ассистент на базе нейросети.\n\n"
-        f"🆓 Бесплатно: <b>{DAILY_FREE_LIMIT} сообщений в день</b>"
-        f"{tribute_text}\n\n"
+        f"🆓 Бесплатно: <b>{DAILY_FREE_LIMIT} сообщений в день</b>\n"
+        "💎 Подписка: безлимит\n\n"
         "Просто напиши свой вопрос 👇\n"
-        "/reset — очистить историю диалога\n"
-        "/status — мой лимит сегодня"
+        "/status — мой статус и лимит\n"
+        "/reset — очистить историю диалога"
     )
 
 
@@ -54,44 +44,42 @@ async def cmd_reset(message: Message):
 
 @dp.message(Command("status"))
 async def cmd_status(message: Message):
-    user_id = message.from_user.id
-    subscribed = await is_subscriber(user_id)
-    user = get_user(user_id)
-    used = user.get("daily_count", 0)
-    remaining = max(0, DAILY_FREE_LIMIT - used)
-
-    if subscribed:
-        await message.answer("💎 У тебя активна платная подписка — безлимитный доступ!")
+    user = get_user(message.from_user.id)
+    if user.get("subscribed"):
+        from datetime import date
+        expires = user.get("subscription_expires", "неизвестно")
+        await message.answer(
+            f"💎 Подписка активна — безлимитный доступ!\n"
+            f"📅 Действует до: <b>{expires}</b>"
+        )
     else:
-        tribute_hint = f"\n\nПодписка для безлимита: {TRIBUTE_CHANNEL}" if TRIBUTE_CHANNEL else ""
+        used = user.get("daily_count", 0)
+        remaining = max(0, DAILY_FREE_LIMIT - used)
         await message.answer(
             f"📊 Использовано сегодня: <b>{used}/{DAILY_FREE_LIMIT}</b>\n"
             f"Осталось бесплатных: <b>{remaining}</b>"
-            f"{tribute_hint}"
         )
 
 
 @dp.message(F.text)
 async def handle_message(message: Message):
     user_id = message.from_user.id
-    subscribed = await is_subscriber(user_id)
     user = get_user(user_id)
 
-    # Проверяем лимит только для бесплатных пользователей
-    if not subscribed:
+    # Проверяем подписку через поле subscribed
+    if not user.get("subscribed"):
         daily_count = user.get("daily_count", 0)
         if daily_count >= DAILY_FREE_LIMIT:
-            tribute_text = f"\n\n💎 Оформи подписку для безлимита: {TRIBUTE_CHANNEL}" if TRIBUTE_CHANNEL else ""
             await message.answer(
                 f"🚫 Ты исчерпал бесплатный лимит на сегодня (<b>{DAILY_FREE_LIMIT} сообщений</b>).\n"
-                f"Лимит обновится завтра в полночь по МСК."
-                f"{tribute_text}"
+                "Лимит обновится завтра в полночь по МСК.\n\n"
+                "💎 Оформи подписку для безлимитного доступа."
             )
             return
 
     history = user.get("history", [])
     history.append({"role": "user", "content": message.text})
-    history = history[-10:]  # ограничиваем контекст
+    history = history[-10:]
 
     await bot.send_chat_action(message.chat.id, "typing")
 
@@ -99,7 +87,7 @@ async def handle_message(message: Message):
         answer, used_model = await ask_ai(history)
     except Exception:
         logging.exception("AI request failed")
-        await message.answer("❌ Не удалось получить ответ от нейросети, попробуй позже 🙏")
+        await message.answer("❌ Не удалось получить ответ, попробуй позже 🙏")
         return
 
     history.append({"role": "assistant", "content": answer})
@@ -109,7 +97,24 @@ async def handle_message(message: Message):
     await message.answer(f"{answer}\n\n<i>🤖 {model_short}</i>")
 
 
+async def on_tribute_webhook(request: web.Request) -> web.Response:
+    """Точка приёма вебхуков от Tribute"""
+    body = await request.read()
+    signature = request.headers.get("trbt-signature", "")
+    await handle_tribute_webhook(body, signature, bot)
+    return web.Response(text="ok")
+
+
 async def main():
+    app = web.Application()
+    app.router.add_post("/tribute", on_tribute_webhook)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", WEBHOOK_PORT)
+    await site.start()
+    logging.info(f"Tribute webhook listening on port {WEBHOOK_PORT}")
+
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
