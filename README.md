@@ -1,49 +1,98 @@
-# TG AI Bot (без вложений)
+# 🤖 TG AI Bot
 
-Telegram-бот на aiogram 3, который отвечает через бесплатные модели OpenRouter
-(DeepSeek, Qwen3, Llama 3.3, Gemma 3). При недоступности/лимите одной модели
-бот автоматически переключается на следующую из списка.
+Telegram-бот с ИИ на базе бесплатных моделей [OpenRouter](https://openrouter.ai).
 
-## Установка
+## Возможности
+- 🆓 20 бесплатных сообщений в день на пользователя
+- 💎 Безлимит для подписчиков Tribute-канала
+- 🔄 Автосброс счётчика каждую ночь
+- 🧠 Контекст диалога (последние 10 сообщений)
+- ⚡ Fallback по нескольким бесплатным моделям
 
-1. Получи токен бота у @BotFather в Telegram.
-2. Зарегистрируйся на https://openrouter.ai, создай API key (Settings -> API Keys).
-   Карта не нужна для бесплатных моделей (у них суффикс `:free`).
-3. Скопируй `.env.example` в `.env` и заполни своими значениями:
+## Команды
+| Команда | Описание |
+|---------|----------|
+| `/start` | Приветствие и инструкция |
+| `/reset` | Очистить историю диалога |
+| `/status` | Сколько сообщений осталось |
 
-   ```
-   cp .env.example .env
-   ```
+## Установка на macOS 10.13+
 
-4. Установи зависимости:
+### 1. Клонировать репозиторий
+```bash
+git clone https://github.com/EgorLesNet/chatbotGPT.git
+cd chatbotGPT
+```
 
-   ```
-   pip install -r requirements.txt
-   ```
+### 2. Создать виртуальное окружение
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-5. Запусти бота локально:
+### 3. Установить зависимости
+```bash
+pip install -r requirements.txt
+```
 
-   ```
-   python main.py
-   ```
+### 4. Настроить переменные окружения
+```bash
+cp .env.example .env
+nano .env  # заполни BOT_TOKEN и OPENROUTER_API_KEY
+```
 
-## Деплой на Render (бесплатно)
+### 5. Запустить бота
+```bash
+python3 main.py
+```
 
-1. Залей проект на GitHub.
-2. На render.com создай Background Worker (не Web Service, т.к. бот на polling).
-3. Start command: `python main.py`
-4. В Environment добавь переменные BOT_TOKEN и OPENROUTER_API_KEY из .env.
-5. Задеплой — бот будет работать 24/7 бесплатно (в рамках лимитов Render free tier).
+### 6. Автозапуск через launchd (macOS)
+Создай файл `~/Library/LaunchAgents/com.tgaibot.plist`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tgaibot</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/path/to/chatbotGPT/venv/bin/python3</string>
+        <string>/path/to/chatbotGPT/main.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/path/to/chatbotGPT</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>BOT_TOKEN</key>
+        <string>your_token</string>
+        <key>OPENROUTER_API_KEY</key>
+        <string>your_key</string>
+        <key>TRIBUTE_CHANNEL</key>
+        <string>@yourchannel</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/tgaibot.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/tgaibot.err</string>
+</dict>
+</plist>
+```
+Затем:
+```bash
+launchctl load ~/Library/LaunchAgents/com.tgaibot.plist
+```
 
-## Ограничения бесплатных моделей OpenRouter
+## Как работает Tribute-проверка
 
-- Обычно 20 запросов в минуту и до 200 в день на бесплатный ключ суммарно по всем `:free` моделям.
-- При превышении лимита бот автоматически пробует следующую модель из FREE_MODELS в ai_client.py.
-- Если нужно больше — можно добавить Groq или Google Gemini free tier как дополнительный fallback.
+1. В [@BotFather](https://t.me/BotFather) выдай боту права администратора в Tribute-канале (или он должен быть участником).
+2. Укажи `TRIBUTE_CHANNEL=@твой_канал` в `.env`.
+3. Бот проверит через `getChatMember` — если пользователь в канале, лимит снимается.
 
-## Расширение
-
-- Хранение истории сейчас в памяти (сбрасывается при перезапуске). Для продакшена
-  можно подключить SQLite/Redis.
-- Можно добавить команду /model для выбора конкретной модели пользователем.
-- Можно логировать использование в БД для аналитики по расходу токенов.
+## Получить ключи
+- **BOT_TOKEN** — [@BotFather](https://t.me/BotFather)
+- **OPENROUTER_API_KEY** — [openrouter.ai/keys](https://openrouter.ai/keys) (бесплатно)

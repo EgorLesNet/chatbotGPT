@@ -11,9 +11,9 @@ client = AsyncOpenAI(
 # Список бесплатных моделей OpenRouter, идём по очереди при ошибке/лимите
 FREE_MODELS = [
     "deepseek/deepseek-chat-v3-0324:free",
-    "qwen/qwen3-coder:free",
     "meta-llama/llama-3.3-70b-instruct:free",
     "google/gemma-3-27b-it:free",
+    "qwen/qwen3-coder:free",
 ]
 
 SYSTEM_PROMPT = {
@@ -32,7 +32,7 @@ async def ask_ai(history: list[dict]) -> tuple[str, str]:
                 model=model,
                 messages=messages,
                 extra_headers={
-                    "HTTP-Referer": "https://github.com/your-repo",
+                    "HTTP-Referer": "https://github.com/EgorLesNet/chatbotGPT",
                     "X-Title": "TG AI Bot",
                 },
                 max_tokens=800,
@@ -45,7 +45,3 @@ async def ask_ai(history: list[dict]) -> tuple[str, str]:
             continue
 
     raise RuntimeError(f"Все модели недоступны: {last_error}")
-
-
-def reset_history():
-    pass
