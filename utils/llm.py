@@ -32,11 +32,17 @@ SYSTEM_PROMPT = """
 Правила: цены реалистичные для России. ONLY raw JSON, no text before or after.
 """.strip()
 
-SYSTEM_PROMPT_LOCAL = """
-Прораб Россия. Оцени ремонт. Отвечай строго в JSON без лишнего текста:
-{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":[{"name":"Эконом","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},{"name":"Оптимальный","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},{"name":"Премиум","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""}],"risks":""}
-Цены в рублях, актуальные для России. ONLY raw JSON.
-""".strip()
+SYSTEM_PROMPT_LOCAL = (
+    "Отвечай ONLY чистым JSON без комментариев. "
+    "Ты прораб в России. Составь смету ремонта с реальными ценами в рублях. "
+    "Верни JSON с полями: "
+    '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽",'
+    '"variants":['
+    '{"name":"Эконом","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},'
+    '{"name":"Оптимальный","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},'
+    '{"name":"Премиум","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""}'
+    '],"risks":""}'
+)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 LLAMACPP_DEFAULT_URL = "http://localhost:11434"
@@ -79,7 +85,6 @@ async def _check_llamacpp() -> tuple[str, str] | None:
 
 
 async def fetch_free_models(api_key: str) -> list[str]:
-    """Fetch free OpenRouter models. Returns [] on any network error."""
     global _free_models_cache
     if _free_models_cache:
         return _free_models_cache
@@ -121,30 +126,18 @@ def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
 
 
 async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
-    """
-    Сначала проверяем локальную модель (не зависит от интернета),
-    затем добавляем облачные если интернет доступен.
-    """
     chain: list[tuple[str, str]] = []
-
-    # 1. Локальная модель — не нужен интернет
     local = await _check_llamacpp()
     if local:
         chain.append(local)
-
-    # 2. Облачные — только если есть сеть
     primary = os.getenv("OPENROUTER_MODEL", "").strip()
     if primary:
         chain.append((primary, OPENROUTER_BASE_URL))
-
-    free_models = await fetch_free_models(api_key)  # [] если сеть недоступна
-    for m in free_models:
+    for m in await fetch_free_models(api_key):
         if not any(m == c[0] for c in chain):
             chain.append((m, OPENROUTER_BASE_URL))
-
     if not chain:
-        logger.error("No models available (no local server, no internet)")
-
+        logger.error("No models available")
     return chain
 
 
@@ -167,6 +160,10 @@ def _clean_json(raw: str) -> str:
     brace = raw.find("{")
     if brace > 0:
         raw = raw[brace:]
+    # Убери всё после последней }
+    last = raw.rfind("}")
+    if last != -1:
+        raw = raw[:last + 1]
     return raw.strip()
 
 
@@ -177,10 +174,14 @@ def _parse_retry_after(exc: RateLimitError) -> float:
         return 15.0
 
 
-async def _try_model(client: AsyncOpenAI, model: str, messages: list, max_tokens: int) -> dict:
-    response = await client.chat.completions.create(
-        model=model, messages=messages, temperature=0.4, max_tokens=max_tokens,
-    )
+async def _try_model(
+    client: AsyncOpenAI, model: str, messages: list,
+    max_tokens: int, use_json_mode: bool
+) -> dict:
+    kwargs: dict = dict(model=model, messages=messages, temperature=0.4, max_tokens=max_tokens)
+    if use_json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
+    response = await client.chat.completions.create(**kwargs)
     raw = response.choices[0].message.content
     return json.loads(_clean_json(raw))
 
@@ -199,6 +200,8 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
         local = _is_local(base_url)
         system_prompt = SYSTEM_PROMPT_LOCAL if local else SYSTEM_PROMPT
         max_tokens = 800 if local else 1800
+        # response_format=json_object работает в llama.cpp >= b2963
+        use_json_mode = local
         client = _make_client(base_url, api_key)
         messages = [
             {"role": "system", "content": system_prompt},
@@ -208,7 +211,7 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
 
         for attempt, delay in enumerate(RETRY_DELAYS, start=1):
             try:
-                result = await _try_model(client, model, messages, max_tokens)
+                result = await _try_model(client, model, messages, max_tokens, use_json_mode)
                 logger.info("Estimate OK via %s (%s)", model, "local" if local else "cloud")
                 return result
 
@@ -238,6 +241,8 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 json_attempts += 1
                 if json_attempts < JSON_MAX_RETRIES:
                     logger.warning("Bad JSON from %s (attempt %d), retrying", model, json_attempts)
+                    # При повторе отключаем json_mode — может помочь
+                    use_json_mode = False
                     await asyncio.sleep(2)
                 else:
                     logger.warning("Bad JSON from %s, skipping", model)
