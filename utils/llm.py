@@ -2,13 +2,13 @@ import os
 import json
 import logging
 from openai import AsyncOpenAI
-from utils.search import search_material_prices
+from utils.materials_db import get_materials_context
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
 Ты — опытный помощник прораба. Твоя задача — по описанию ситуации клиента дать чёткую профессиональную оценку.
-Если предоставлены актуальные данные из интернета — используй их для уточнения цен.
+Если предоставлены данные о материалах — используй их для точных цен в смете.
 
 Формат ответа СТРОГО в JSON (no markdown blocks):
 {
@@ -72,7 +72,7 @@ def _get_client() -> AsyncOpenAI:
     )
 
 
-def _build_user_message(situation: str, project: dict | None, web_context: str) -> str:
+def _build_user_message(situation: str, project: dict | None, materials_context: str) -> str:
     parts = [f"Ситуация клиента: {situation}"]
     if project:
         parts.append(f"Объект: {project.get('title', '')}")
@@ -80,8 +80,8 @@ def _build_user_message(situation: str, project: dict | None, web_context: str) 
         parts.append(f"Площадь: {project.get('area_m2', '')} м²")
         if project.get("notes"):
             parts.append(f"Доп. заметки: {project['notes']}")
-    if web_context:
-        parts.append(f"\nАктуальные данные из интернета (2026):\n{web_context}")
+    if materials_context:
+        parts.append(f"\n{materials_context}")
     return "\n".join(parts)
 
 
@@ -97,10 +97,11 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
     client = _get_client()
     model = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
 
-    # Параллельно подтягиваем актуальные цены из интернета
-    web_context = await search_material_prices(situation)
+    # Шаг 1: база → фоллбек в интернет
+    materials_context = await get_materials_context(situation, limit=3)
 
-    user_msg = _build_user_message(situation, project, web_context)
+    # Шаг 2: LLM с контекстом
+    user_msg = _build_user_message(situation, project, materials_context)
 
     response = await client.chat.completions.create(
         model=model,
