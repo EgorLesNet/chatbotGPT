@@ -50,11 +50,15 @@ SYSTEM_PROMPT = """
 """
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OLLAMA_BASE_URL = "http://localhost:11434/v1"
-HTTPX_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=5.0)
+# llama.cpp server: задаётся через .env
+# LLAMACPP_URL=http://localhost:11434  (по умолчанию)
+# LLAMACPP_MODEL=Qwen2.5-7B-Instruct-Q4_K_M  (имя модели для API, можно любое)
+LLAMACPP_DEFAULT_URL = "http://localhost:11434"
+
+HTTPX_TIMEOUT = httpx.Timeout(connect=5.0, read=180.0, write=15.0, pool=5.0)
 RETRY_DELAYS = [2, 5, 15]
-MAX_RATE_LIMIT_WAIT = 30  # ждём до 30с на rate limit
-JSON_MAX_RETRIES = 2      # повторных попыток при плохом JSON
+MAX_RATE_LIMIT_WAIT = 30
+JSON_MAX_RETRIES = 2
 
 _BLOCKLIST_KEYWORDS = [
     "content-safety", "moderation", "guard", "embedding",
@@ -69,18 +73,23 @@ def _is_chat_model(model_id: str) -> bool:
     return not any(kw in mid for kw in _BLOCKLIST_KEYWORDS)
 
 
-async def _get_ollama_models() -> list[str]:
-    """Returns list of locally available Ollama models, or empty list."""
+async def _check_llamacpp() -> tuple[str, str] | None:
+    """
+    Проверяет доступность llama.cpp сервера через /health.
+    Возвращает (model_name, base_url) или None.
+    """
+    base_url = os.getenv("LLAMACPP_URL", LLAMACPP_DEFAULT_URL).rstrip("/")
+    model_name = os.getenv("LLAMACPP_MODEL", "local-model")
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
-            resp = await client.get("http://localhost:11434/api/tags")
+            resp = await client.get(f"{base_url}/health")
             if resp.status_code == 200:
-                models = [m["name"] for m in resp.json().get("models", [])]
-                logger.info("Ollama models available: %s", models)
-                return [f"ollama/{m}" for m in models]
+                logger.info("llama.cpp server is up at %s, model=%s", base_url, model_name)
+                return model_name, f"{base_url}/v1"
     except Exception:
         pass
-    return []
+    logger.info("llama.cpp server not available at %s", base_url)
+    return None
 
 
 async def fetch_free_models(api_key: str) -> list[str]:
@@ -103,7 +112,7 @@ async def fetch_free_models(api_key: str) -> list[str]:
         priority = ["llama", "gemma", "qwen", "nemotron", "hermes", "mistral"]
         free.sort(key=lambda mid: next((i for i, kw in enumerate(priority) if kw in mid), len(priority)))
         _free_models_cache = free[:10]
-        logger.info("Loaded %d free chat models: %s", len(_free_models_cache), _free_models_cache)
+        logger.info("Loaded %d free chat models from OpenRouter", len(_free_models_cache))
         return _free_models_cache
     except Exception:
         logger.warning("Could not fetch OpenRouter models", exc_info=True)
@@ -111,37 +120,33 @@ async def fetch_free_models(api_key: str) -> list[str]:
 
 
 def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
+    is_local = "localhost" in base_url or "127.0.0.1" in base_url
     return AsyncOpenAI(
-        api_key=api_key or "ollama",
+        api_key="local" if is_local else api_key,
         base_url=base_url,
         timeout=HTTPX_TIMEOUT,
         max_retries=0,
-        default_headers={
+        default_headers={} if is_local else {
             "HTTP-Referer": os.getenv("APP_URL", "https://github.com/EgorLesNet/chatbotGPT"),
             "X-Title": "ProrabBot",
-        } if "openrouter" in base_url else {},
+        },
     )
 
 
 async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
-    """
-    Returns list of (model_id, base_url) tuples.
-    Ollama local models go first if available.
-    """
     chain: list[tuple[str, str]] = []
 
-    # 1. Локальные Ollama-модели
-    ollama_models = await _get_ollama_models()
-    for m in ollama_models:
-        model_name = m.removeprefix("ollama/")
-        chain.append((model_name, OLLAMA_BASE_URL))
+    # 1. Локальный llama.cpp
+    local = await _check_llamacpp()
+    if local:
+        chain.append(local)
 
-    # 2. Указанная в .env модель
+    # 2. Явно указанная модель в .env
     primary = os.getenv("OPENROUTER_MODEL", "").strip()
     if primary:
         chain.append((primary, OPENROUTER_BASE_URL))
 
-    # 3. Автоподбор из OpenRouter API
+    # 3. Автоподбор из OpenRouter
     free_models = await fetch_free_models(api_key)
     for m in free_models:
         if not any(m == c[0] for c in chain):
@@ -169,7 +174,6 @@ def _clean_json(raw: str) -> str:
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1]
         raw = raw.rsplit("```", 1)[0]
-    # Ищем первый { если модель добавила текст до JSON
     brace = raw.find("{")
     if brace > 0:
         raw = raw[brace:]
@@ -210,7 +214,7 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
         for attempt, delay in enumerate(RETRY_DELAYS, start=1):
             try:
                 result = await _try_model(client, model, messages)
-                logger.info("Estimate OK via %s @ %s", model, base_url)
+                logger.info("Estimate OK via %s", model)
                 return result
 
             except NotFoundError:
@@ -241,7 +245,7 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                     logger.warning("Bad JSON from %s (attempt %d), retrying", model, json_attempts)
                     await asyncio.sleep(2)
                 else:
-                    logger.warning("Bad JSON from %s after %d attempts, skipping", model, json_attempts)
+                    logger.warning("Bad JSON from %s, skipping", model)
                     break
 
     raise RuntimeError("Ни одна модель не ответила")
