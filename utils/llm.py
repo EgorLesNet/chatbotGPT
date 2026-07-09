@@ -52,30 +52,58 @@ SYSTEM_PROMPT = """
   ],
   "risks": "Что важно учесть прорабу"
 }
-
 Правила:
-- Учитывай площадь объекта если указана
-- Цены реалистичные, актуальные для России 2024-2026
-- Материалы подбирай исходя из стиля, бюджета и ситуации клиента
+- Учитывай площадь, цены реалистичные для России
 - Возвращай ONLY raw JSON, no markdown fences
 """
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-
-# Актуальные бесплатные модели OpenRouter (июль 2026)
-# https://openrouter.ai/models?fmt=cards&q=free
-FALLBACK_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "google/gemma-4-31b-it:free",
-    "qwen/qwen3-coder:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "nousresearch/hermes-3-llama-3.1-405b:free",
-    "openrouter/free",  # universal fallback от OpenRouter
-]
-
 HTTPX_TIMEOUT = httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=5.0)
 RETRY_DELAYS = [2, 5, 10]
+
+# Кэш бесплатных моделей, заполняется при старте
+_free_models_cache: list[str] = []
+
+
+async def fetch_free_models(api_key: str) -> list[str]:
+    """
+    Получает список доступных бесплатных моделей прямо из API OpenRouter.
+    Бесплатные модели имеют pricing.prompt == "0" или id оканчивается на :free
+    """
+    global _free_models_cache
+    if _free_models_cache:
+        return _free_models_cache
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{OPENROUTER_BASE_URL}/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        free = [
+            m["id"] for m in data.get("data", [])
+            if m["id"].endswith(":free")
+            or str(m.get("pricing", {}).get("prompt", "1")) == "0"
+        ]
+        # Предпочитаем популярные (llama, gemma, qwen)
+        priority = ["llama", "gemma", "qwen", "nemotron", "hermes"]
+        def score(mid: str) -> int:
+            for i, kw in enumerate(priority):
+                if kw in mid:
+                    return i
+            return len(priority)
+        free.sort(key=score)
+
+        _free_models_cache = free[:8]  # берём топ-8
+        logger.info("Loaded %d free models from OpenRouter: %s", len(_free_models_cache), _free_models_cache)
+        return _free_models_cache
+
+    except Exception:
+        logger.warning("Could not fetch models list, using built-in fallback", exc_info=True)
+        return ["openrouter/auto"]
 
 
 def _get_client() -> AsyncOpenAI:
@@ -91,10 +119,14 @@ def _get_client() -> AsyncOpenAI:
     )
 
 
-def _get_model_chain() -> list[str]:
-    primary = os.getenv("OPENROUTER_MODEL", FALLBACK_MODELS[0])
-    chain = [primary] + [m for m in FALLBACK_MODELS if m != primary]
-    return chain
+async def _get_model_chain(api_key: str) -> list[str]:
+    primary = os.getenv("OPENROUTER_MODEL", "")
+    free_models = await fetch_free_models(api_key)
+    if primary and primary not in free_models:
+        return [primary] + free_models
+    if primary:
+        return [primary] + [m for m in free_models if m != primary]
+    return free_models
 
 
 def _build_user_message(situation: str, project: dict | None, materials_context: str) -> str:
@@ -120,18 +152,16 @@ def _clean_json(raw: str) -> str:
 
 async def _try_model(client: AsyncOpenAI, model: str, messages: list) -> dict:
     response = await client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=0.4,
-        max_tokens=1800,
+        model=model, messages=messages, temperature=0.4, max_tokens=1800,
     )
     raw = response.choices[0].message.content
     return json.loads(_clean_json(raw))
 
 
 async def get_estimate(situation: str, project: dict | None = None) -> dict:
+    api_key = os.getenv("OPENROUTER_API_KEY", "")
     client = _get_client()
-    model_chain = _get_model_chain()
+    model_chain = await _get_model_chain(api_key)
 
     materials_context = await get_materials_context(situation, limit=3)
     user_msg = _build_user_message(situation, project, materials_context)
@@ -147,24 +177,25 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
             try:
                 result = await _try_model(client, model, messages)
                 if model != model_chain[0]:
-                    logger.info("Succeeded with fallback model: %s", model)
+                    logger.info("Succeeded with model: %s", model)
                 return result
 
             except NotFoundError:
                 logger.warning("Model not available: %s — skipping", model)
+                _free_models_cache.clear()  # сбросить кэш чтобы перечитать
                 break
 
             except (APITimeoutError, APIConnectionError) as exc:
                 last_exc = exc
                 if attempt < len(RETRY_DELAYS):
-                    logger.warning("Timeout on %s (attempt %d), retrying in %ds...", model, attempt, delay)
+                    logger.warning("Timeout on %s (attempt %d), retrying in %ds", model, attempt, delay)
                     await asyncio.sleep(delay)
                 else:
-                    logger.warning("All retries failed for %s, trying next model", model)
+                    logger.warning("All retries failed for %s", model)
                     break
 
             except json.JSONDecodeError as exc:
-                logger.warning("Bad JSON from %s: %s", model, exc)
+                logger.warning("Bad JSON from %s", model)
                 last_exc = exc
                 break
 
@@ -172,4 +203,4 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
         raise TimeoutError("Все модели недоступны")
     if isinstance(last_exc, json.JSONDecodeError):
         raise ValueError("Некорректный ответ")
-    raise RuntimeError("Ни одна модель не ответила. Проверь OPENROUTER_API_KEY")
+    raise RuntimeError("Ни одна модель не ответила")
