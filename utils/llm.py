@@ -62,12 +62,16 @@ SYSTEM_PROMPT = """
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Цепочка fallback-моделей: пробуем по порядку если предыдущая недоступна
+# Актуальные бесплатные модели OpenRouter (июль 2026)
+# https://openrouter.ai/models?fmt=cards&q=free
 FALLBACK_MODELS = [
-    "deepseek/deepseek-r1:free",
-    "google/gemma-3-12b-it:free",
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "microsoft/phi-4-reasoning:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "google/gemma-4-31b-it:free",
+    "qwen/qwen3-coder:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "openrouter/free",  # universal fallback от OpenRouter
 ]
 
 HTTPX_TIMEOUT = httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=5.0)
@@ -88,7 +92,6 @@ def _get_client() -> AsyncOpenAI:
 
 
 def _get_model_chain() -> list[str]:
-    """Primary model from .env + fallbacks (without duplicates)."""
     primary = os.getenv("OPENROUTER_MODEL", FALLBACK_MODELS[0])
     chain = [primary] + [m for m in FALLBACK_MODELS if m != primary]
     return chain
@@ -116,7 +119,6 @@ def _clean_json(raw: str) -> str:
 
 
 async def _try_model(client: AsyncOpenAI, model: str, messages: list) -> dict:
-    """Single attempt with one model. Raises on any error."""
     response = await client.chat.completions.create(
         model=model,
         messages=messages,
@@ -149,29 +151,25 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 return result
 
             except NotFoundError:
-                logger.warning("Model not available on OpenRouter: %s — skipping", model)
-                last_exc = None
-                break  # эта модель недоступна, переходим к следующей
+                logger.warning("Model not available: %s — skipping", model)
+                break
 
             except (APITimeoutError, APIConnectionError) as exc:
                 last_exc = exc
                 if attempt < len(RETRY_DELAYS):
-                    logger.warning(
-                        "Timeout on %s (attempt %d/%d), retrying in %ds...",
-                        model, attempt, len(RETRY_DELAYS), delay,
-                    )
+                    logger.warning("Timeout on %s (attempt %d), retrying in %ds...", model, attempt, delay)
                     await asyncio.sleep(delay)
                 else:
-                    logger.warning("All retries failed for model %s, trying next", model)
+                    logger.warning("All retries failed for %s, trying next model", model)
                     break
 
             except json.JSONDecodeError as exc:
                 logger.warning("Bad JSON from %s: %s", model, exc)
                 last_exc = exc
-                break  # плохой ответ модели, пробуем следующую
+                break
 
     if isinstance(last_exc, (APITimeoutError, APIConnectionError)):
         raise TimeoutError("Все модели недоступны")
     if isinstance(last_exc, json.JSONDecodeError):
         raise ValueError("Некорректный ответ")
-    raise RuntimeError("Ни одна модель не ответила")
+    raise RuntimeError("Ни одна модель не ответила. Проверь OPENROUTER_API_KEY")
