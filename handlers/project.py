@@ -1,11 +1,12 @@
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 
 from utils.storage import create_project, ensure_user, get_user_projects, reset_user_month
 from utils.subscription import can_create_project, get_plan_limits
+from utils.keyboards import back_kb
 
 router = Router()
 
@@ -27,26 +28,61 @@ TYPE_KB = ReplyKeyboardMarkup(
 )
 
 
+def _projects_text(projects: list[dict]) -> str:
+    lines = ["📁 <b>Проекты</b>"]
+    for p in projects[-10:]:
+        est_count = len(p.get("estimates", []))
+        est_label = f" · 📋 {est_count} сметы" if est_count else ""
+        lines.append(
+            f"• <b>{p['title']}</b> — {p['project_type']}, {p['area_m2']} м²"
+            f", {p['created_at'][:10]}{est_label}"
+        )
+    return "\n".join(lines)
+
+
+@router.callback_query(F.data == "nav:projects")
+async def cb_nav_projects(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    user = ensure_user(call.from_user)
+    reset_user_month(user["id"])
+    existing = get_user_projects(user["id"])
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    if existing:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Новый проект", callback_data="project:new")],
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="nav:menu")],
+        ])
+        await call.message.answer(_projects_text(existing), reply_markup=kb)
+    else:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Создать проект", callback_data="project:new")],
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="nav:menu")],
+        ])
+        await call.message.answer("📁 Проектов пока нет.", reply_markup=kb)
+
+
+@router.callback_query(F.data == "project:new")
+async def cb_project_new(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    user = ensure_user(call.from_user)
+    reset_user_month(user["id"])
+    await _start_create(call.message, state, user)
+
+
 @router.message(Command("project"))
 async def cmd_project(message: Message, state: FSMContext) -> None:
     user = ensure_user(message.from_user)
     reset_user_month(user["id"])
     existing = get_user_projects(user["id"])
-
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     if existing:
-        lines = ["📁 <b>Проекты пользователя</b>"]
-        for p in existing[-10:]:
-            est_count = len(p.get("estimates", []))
-            est_label = f", 📋 {est_count} смета" if est_count else ""
-            lines.append(
-                f"• <b>{p['title']}</b> — {p['project_type']}, "
-                f"{p['area_m2']} м², создан {p['created_at'][:10]}{est_label}"
-            )
-        lines.append("\n➕ Создать новый — /newproject")
-        await message.answer("\n".join(lines))
-        return
-
-    await _start_create(message, state, user)
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Новый проект", callback_data="project:new")],
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="nav:menu")],
+        ])
+        await message.answer(_projects_text(existing), reply_markup=kb)
+    else:
+        await _start_create(message, state, user)
 
 
 @router.message(Command("newproject"))
@@ -60,16 +96,15 @@ async def _start_create(message: Message, state: FSMContext, user: dict) -> None
     if not can_create_project(user):
         limits = get_plan_limits(user)
         await message.answer(
-            "🚫 Лимит по free-плану исчерпан.\n"
-            f"Можно создать только <b>{limits['projects_per_month_label']}</b> проект(а) в месяц.\n"
-            "Оформи paid-план для безлимита: /subscribe"
+            "🚫 Лимит free-плана исчерпан.\n"
+            f"Максимум <b>{limits['projects_per_month_label']}</b> проект(а) в месяц.\n"
+            "Оформи paid: /subscribe",
+            reply_markup=back_kb(),
         )
         return
     await state.set_state(ProjectForm.title)
     await message.answer(
-        "🏗 <b>Создание нового проекта</b>\n\n"
-        "Шаг 1/4 — Введи <b>название объекта</b>:\n"
-        "<i>(например: Квартира на Ленина, 34)</i>",
+        "🏗 <b>Новый проект</b>\n\nШаг 1/4 — название объекта:",
         reply_markup=ReplyKeyboardRemove(),
     )
 
@@ -78,18 +113,14 @@ async def _start_create(message: Message, state: FSMContext, user: dict) -> None
 async def step_title(message: Message, state: FSMContext) -> None:
     await state.update_data(title=message.text.strip())
     await state.set_state(ProjectForm.project_type)
-    await message.answer("Шаг 2/4 — Выбери <b>тип объекта</b>:", reply_markup=TYPE_KB)
+    await message.answer("Шаг 2/4 — тип объекта:", reply_markup=TYPE_KB)
 
 
 @router.message(ProjectForm.project_type)
 async def step_type(message: Message, state: FSMContext) -> None:
     await state.update_data(project_type=message.text.strip())
     await state.set_state(ProjectForm.area)
-    await message.answer(
-        "Шаг 3/4 — Введи <b>площадь объекта</b> в м²:\n"
-        "<i>(только число, например: 65)</i>",
-        reply_markup=ReplyKeyboardRemove(),
-    )
+    await message.answer("Шаг 3/4 — площадь в м²:", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(ProjectForm.area)
@@ -100,14 +131,11 @@ async def step_area(message: Message, state: FSMContext) -> None:
         if area <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("⚠️ Введи корректное число площади, например: 42")
+        await message.answer("⚠️ Введи корректное число, например: 42")
         return
     await state.update_data(area=area)
     await state.set_state(ProjectForm.notes)
-    await message.answer(
-        "Шаг 4/4 — Добавь <b>комментарий</b> к объекту:\n"
-        "<i>(особенности, пожелания — или отправь <b>-</b> чтобы пропустить)</i>"
-    )
+    await message.answer("Шаг 4/4 — комментарий к объекту (или <b>-</b> чтобы пропустить):")
 
 
 @router.message(ProjectForm.notes)
@@ -126,11 +154,8 @@ async def step_notes(message: Message, state: FSMContext) -> None:
     )
     await state.clear()
     await message.answer(
-        f"✅ <b>Проект создан!</b>\n\n"
-        f"🏷 Название: <b>{project['title']}</b>\n"
-        f"🏠 Тип: <b>{project['project_type']}</b>\n"
-        f"📐 Площадь: <b>{project['area_m2']} м²</b>\n"
-        f"📝 Комментарий: <b>{project['notes'] or '—'}</b>\n\n"
-        "Теперь используй /estimate для подбора сметы.",
-        reply_markup=ReplyKeyboardRemove(),
+        f"✅ Проект <b>{project['title']}</b> создан!\n"
+        f"🏠 {project['project_type']} · 📐 {project['area_m2']} м²\n"
+        f"📝 {project['notes'] or '—'}",
+        reply_markup=back_kb(),
     )
