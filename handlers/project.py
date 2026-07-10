@@ -36,11 +36,13 @@ async def cmd_project(message: Message, state: FSMContext) -> None:
     if existing:
         lines = ["📁 <b>Проекты пользователя</b>"]
         for p in existing[-10:]:
+            est_count = len(p.get("estimates", []))
+            est_label = f", 📋 {est_count} смета" if est_count else ""
             lines.append(
                 f"• <b>{p['title']}</b> — {p['project_type']}, "
-                f"{p['area_m2']} м², создан {p['created_at'][:10]}"
+                f"{p['area_m2']} м², создан {p['created_at'][:10]}{est_label}"
             )
-        lines.append("\n➕ Чтобы создать новый — /newproject")
+        lines.append("\n➕ Создать новый — /newproject")
         await message.answer("\n".join(lines))
         return
 
@@ -60,14 +62,14 @@ async def _start_create(message: Message, state: FSMContext, user: dict) -> None
         await message.answer(
             "🚫 Лимит по free-плану исчерпан.\n"
             f"Можно создать только <b>{limits['projects_per_month_label']}</b> проект(а) в месяц.\n"
-            "Оформи paid-план для безлимита."
+            "Оформи paid-план для безлимита: /subscribe"
         )
         return
     await state.set_state(ProjectForm.title)
     await message.answer(
         "🏗 <b>Создание нового проекта</b>\n\n"
         "Шаг 1/4 — Введи <b>название объекта</b>:\n"
-        "(например: Квартира на Ленина, 34)",
+        "<i>(например: Квартира на Ленина, 34)</i>",
         reply_markup=ReplyKeyboardRemove(),
     )
 
@@ -76,10 +78,7 @@ async def _start_create(message: Message, state: FSMContext, user: dict) -> None
 async def step_title(message: Message, state: FSMContext) -> None:
     await state.update_data(title=message.text.strip())
     await state.set_state(ProjectForm.project_type)
-    await message.answer(
-        "Шаг 2/4 — Выбери <b>тип объекта</b>:",
-        reply_markup=TYPE_KB,
-    )
+    await message.answer("Шаг 2/4 — Выбери <b>тип объекта</b>:", reply_markup=TYPE_KB)
 
 
 @router.message(ProjectForm.project_type)
@@ -88,7 +87,7 @@ async def step_type(message: Message, state: FSMContext) -> None:
     await state.set_state(ProjectForm.area)
     await message.answer(
         "Шаг 3/4 — Введи <b>площадь объекта</b> в м²:\n"
-        "(только число, например: 65)",
+        "<i>(только число, например: 65)</i>",
         reply_markup=ReplyKeyboardRemove(),
     )
 
@@ -107,7 +106,7 @@ async def step_area(message: Message, state: FSMContext) -> None:
     await state.set_state(ProjectForm.notes)
     await message.answer(
         "Шаг 4/4 — Добавь <b>комментарий</b> к объекту:\n"
-        "(особенности, пожелания, материалы — или отправь <b>-</b> чтобы пропустить)"
+        "<i>(особенности, пожелания — или отправь <b>-</b> чтобы пропустить)</i>"
     )
 
 
@@ -132,6 +131,6 @@ async def step_notes(message: Message, state: FSMContext) -> None:
         f"🏠 Тип: <b>{project['project_type']}</b>\n"
         f"📐 Площадь: <b>{project['area_m2']} м²</b>\n"
         f"📝 Комментарий: <b>{project['notes'] or '—'}</b>\n\n"
-        "Теперь используй /materials для подбора материалов или /rates для расценок.",
+        "Теперь используй /estimate для подбора сметы.",
         reply_markup=ReplyKeyboardRemove(),
     )

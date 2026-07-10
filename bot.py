@@ -9,7 +9,6 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 from handlers.estimate import router as estimate_router
-from handlers.materials import router as materials_router
 from handlers.project import router as project_router
 from handlers.rates import router as rates_router
 from handlers.start import router as start_router
@@ -29,7 +28,6 @@ for router in [
     estimate_router,
     rates_router,
     project_router,
-    materials_router,
     subscribe_router,
     voice_router,
 ]:
