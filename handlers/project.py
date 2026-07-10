@@ -13,7 +13,7 @@ from utils.storage import (
     get_project_by_id, update_estimate_in_project,
     delete_estimate_from_project, reset_user_month,
 )
-from utils.subscription import can_create_project, get_plan_limits
+from utils.subscription import can_create_project, get_plan_limits, is_paid_active
 from utils.keyboards import back_kb
 
 router = Router()
@@ -113,8 +113,9 @@ def _estimate_detail_text(e: dict, idx: int) -> str:
     for i, v in enumerate((e.get("variants") or [])[:3]):
         icon = _VARIANT_ICONS[i] if i < len(_VARIANT_ICONS) else "•"
         style = v.get("style") or ""
+        lock = " 🔒" if i > 0 else ""
         lines.append(
-            f"{icon} <b>{v.get('name', '')} — {style}</b>  "
+            f"{icon} <b>{v.get('name', '')} — {style}</b>{lock}  "
             f"{_fmt(v.get('total', 0))} {cur}"
         )
         lines.append(
@@ -131,17 +132,23 @@ def _estimate_detail_text(e: dict, idx: int) -> str:
     return "\n".join(lines)
 
 
-def _estimate_detail_kb(project_id: str, idx: int, variants: list) -> InlineKeyboardMarkup:
+def _estimate_detail_kb(project_id: str, idx: int, variants: list, paid: bool) -> InlineKeyboardMarkup:
     pid = project_id
-    # Кнопки открытия вариантов
     variant_row = []
     for v_idx, v in enumerate(variants[:3]):
         icon = _VARIANT_ICONS[v_idx] if v_idx < len(_VARIANT_ICONS) else "•"
         name = v.get("name") or _VARIANT_NAMES[v_idx]
-        variant_row.append(InlineKeyboardButton(
-            text=f"{icon} {name}",
-            callback_data=f"proj:var:{pid}:{idx}:{v_idx}",
-        ))
+        if v_idx > 0 and not paid:
+            # Платный вариант — кнопка с замком, но всё равно кликабельна (покажем upsell)
+            variant_row.append(InlineKeyboardButton(
+                text=f"🔒 {name}",
+                callback_data=f"proj:var:{pid}:{idx}:{v_idx}",
+            ))
+        else:
+            variant_row.append(InlineKeyboardButton(
+                text=f"{icon} {name}",
+                callback_data=f"proj:var:{pid}:{idx}:{v_idx}",
+            ))
     rows = []
     if variant_row:
         rows.append(variant_row)
@@ -184,7 +191,6 @@ def _variant_detail_text(e: dict, est_idx: int, v_idx: int) -> str:
         "",
     ]
 
-    # Работы
     works = v.get("works") or []
     if works:
         lines.append("🔨 <b>Работы:</b>")
@@ -198,7 +204,6 @@ def _variant_detail_text(e: dict, est_idx: int, v_idx: int) -> str:
 
     lines.append("")
 
-    # Материалы
     materials = v.get("materials") or []
     if materials:
         lines.append(f"🧱 <b>Материалы ({style}):</b>")
@@ -283,9 +288,10 @@ async def cb_estimate_view(call: CallbackQuery, state: FSMContext) -> None:
         return
     e = estimates[idx]
     variants = e.get("variants") or []
+    paid = is_paid_active(user)
     await call.message.answer(
         _estimate_detail_text(e, idx),
-        reply_markup=_estimate_detail_kb(project_id, idx, variants),
+        reply_markup=_estimate_detail_kb(project_id, idx, variants, paid),
     )
 
 
@@ -302,6 +308,20 @@ async def cb_variant_view(call: CallbackQuery, state: FSMContext) -> None:
     project_id = parts[2]
     est_idx = int(parts[3])
     v_idx = int(parts[4])
+
+    # Варианты Оптимальный (1) и Премиум (2) — только для paid
+    if v_idx > 0 and not is_paid_active(user):
+        await call.message.answer(
+            "🔒 <b>Оптимальный и Премиум варианты доступны в paid-плане.</b>\n\n"
+            "Там ты увидишь полный список работ и материалов среднего и премиального сегмента.\n\n"
+            "Оформи подписку: /subscribe",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💳 Оформить подписку", callback_data="nav:subscribe")],
+                [InlineKeyboardButton(text="◀️ К смете", callback_data=f"proj:est:{project_id}:{est_idx}")],
+            ]),
+        )
+        return
+
     project = get_project_by_id(user["id"], project_id)
     if not project:
         await call.message.answer("⚠️ Проект не найден.")
@@ -312,15 +332,27 @@ async def cb_variant_view(call: CallbackQuery, state: FSMContext) -> None:
         return
     e = estimates[est_idx]
     text = _variant_detail_text(e, est_idx, v_idx)
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text=f"{_VARIANT_ICONS[i]} {(e.get('variants') or [])[i].get('name', _VARIANT_NAMES[i]) if i < len(e.get('variants') or []) else _VARIANT_NAMES[i]}",
+
+    # Кнопки других вариантов с учётом paid
+    paid = is_paid_active(user)
+    other_buttons = []
+    for i in range(min(3, len(e.get("variants") or []))):
+        if i == v_idx:
+            continue
+        v_name = (e.get("variants") or [])[i].get("name", _VARIANT_NAMES[i]) if i < len(e.get("variants") or []) else _VARIANT_NAMES[i]
+        if i > 0 and not paid:
+            other_buttons.append(InlineKeyboardButton(
+                text=f"🔒 {v_name}",
                 callback_data=f"proj:var:{project_id}:{est_idx}:{i}",
-            )
-            for i in range(min(3, len(e.get("variants") or [])))
-            if i != v_idx
-        ],
+            ))
+        else:
+            other_buttons.append(InlineKeyboardButton(
+                text=f"{_VARIANT_ICONS[i]} {v_name}",
+                callback_data=f"proj:var:{project_id}:{est_idx}:{i}",
+            ))
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        other_buttons,
         [InlineKeyboardButton(text="◀️ К смете", callback_data=f"proj:est:{project_id}:{est_idx}")],
     ])
     await call.message.answer(text, reply_markup=kb)
