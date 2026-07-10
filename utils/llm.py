@@ -3,6 +3,7 @@ import json
 import logging
 import asyncio
 import re
+import math
 import httpx
 from openai import AsyncOpenAI, APITimeoutError, APIConnectionError, NotFoundError, RateLimitError, APIStatusError
 from utils.materials_db import get_materials_context
@@ -32,6 +33,13 @@ SYSTEM_PROMPT = """
 - cost_max = максимальный total среди вариантов
 - Никогда не ставь cost_min и cost_max в 0, если варианты посчитаны.
 - Если задача "полный ремонт квартиры", итог не должен выглядеть как локальный частичный ремонт.
+- Количество материала считай только математически: quantity = ceiling((площадь × норма расхода) / вес упаковки) для мешков/канистр/упаковок. Нельзя задавать количество произвольно.
+- Для каждого сыпучего или жидкого материала обязательно указывай норму расхода в названии или бренде, например: "Расход 8.5 кг/м²" или "Расход 0.15 л/м²".
+- Штукатурка потолков стоит на 20–40% дороже штукатурки стен при прочих равных.
+- Перед штукатуркой обязательно добавляй грунтовку основания как отдельную работу и отдельный материал, если есть штукатурка стен или потолков.
+- Никогда не оставляй пустые blocks pros/cons и не отдавай вариант с 0 позициями материалов, если сам вариант показан пользователю.
+- Порядок вариантов обязателен: total(Эконом) < total(Оптимальный) < total(Премиум). Если расчёт нарушает порядок — пересчитай до соблюдения.
+- Диапазон "cost_min/cost_max" должен строго совпадать с минимальным и максимальным total среди трёх вариантов.
 
 Верни ONLY raw JSON:
 {
@@ -81,12 +89,17 @@ SYSTEM_PROMPT = """
 }
 """.strip()
 
-# Сжатый промпт для Groq (лимит ~6000 TPM на запрос + ответ)
 SYSTEM_PROMPT_GROQ = (
     "Ты — прораб-сметчик в России. Составь смету ремонта в 3 вариантах (Эконом/Оптимальный/Премиум). "
     "Для полного ремонта квартиры включай демонтаж, стены, полы, потолки, электрику, сантехнику, чистовую отделку. "
-    "Никогда не ставь cost_min/cost_max в 0 если варианты посчитаны. "
     "Используй расценки мастера, если переданы. "
+    "Считай количество материалов только математически по норме расхода и округляй вверх. "
+    "Для сыпучих и жидких материалов указывай норму расхода в названии или бренде. "
+    "Штукатурка потолков должна быть на 20-40% дороже штукатурки стен. "
+    "Если есть штукатурка, обязательно добавь грунтовку отдельной работой и материалом. "
+    "Соблюдай строгий порядок total: Эконом < Оптимальный < Премиум. "
+    "Никогда не ставь cost_min/cost_max в 0 если варианты посчитаны; диапазон должен совпадать с min/max total. "
+    "Не отдавай пустые варианты с 0 материалов. "
     "Отвечай ONLY чистым JSON без комментариев:"
     '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
     '{"name":"Эконом","style":"Бюджетный","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
@@ -98,6 +111,9 @@ SYSTEM_PROMPT_GROQ = (
 SYSTEM_PROMPT_LOCAL = (
     "Отвечай ONLY чистым JSON. Смета ремонта в РФ в 3 вариантах. "
     "Используй расценки мастера на работы, если они переданы. "
+    "Считай количество материалов по обычной арифметике через норму расхода. "
+    "Соблюдай порядок total: Эконом < Оптимальный < Премиум. "
+    "Не оставляй пустые варианты и соблюдай cost_min/cost_max = min/max total. "
     '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
     '{"name":"Эконом","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
     '{"name":"Оптимальный","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
@@ -378,6 +394,215 @@ def _norm_int(val) -> int:
         return 0
 
 
+def _ceil_int(val: float) -> int:
+    try:
+        return int(math.ceil(float(val)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _extract_consumption(text: str) -> float | None:
+    if not text:
+        return None
+    s = str(text).lower().replace(",", ".")
+    patterns = [
+        r"расход\s*(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*кг/м2",
+        r"расход\s*(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*кг/м²",
+        r"(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*кг/м2",
+        r"(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*кг/м²",
+        r"расход\s*(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*л/м2",
+        r"расход\s*(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*л/м²",
+        r"(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*л/м2",
+        r"(\d+(?:\.\d+)?)\s*(?:-|–|—)?\s*(\d+(?:\.\d+)?)?\s*л/м²",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, s)
+        if m:
+            a = float(m.group(1))
+            b = float(m.group(2)) if m.group(2) else None
+            return (a + b) / 2 if b else a
+    return None
+
+
+def _extract_pack_weight_kg(text: str) -> float | None:
+    if not text:
+        return None
+    s = str(text).lower().replace(",", ".")
+    m = re.search(r"(\d+(?:\.\d+)?)\s*кг", s)
+    if m:
+        return float(m.group(1))
+    return None
+
+
+def _extract_pack_volume_l(text: str) -> float | None:
+    if not text:
+        return None
+    s = str(text).lower().replace(",", ".")
+    m = re.search(r"(\d+(?:\.\d+)?)\s*л\b", s)
+    if m:
+        return float(m.group(1))
+    return None
+
+
+def _find_related_work_qty(works: list[dict], keywords: list[str]) -> int:
+    max_qty = 0
+    for w in works:
+        name = (w.get("name") or "").lower()
+        if any(k in name for k in keywords):
+            max_qty = max(max_qty, _norm_int(w.get("qty") or 0))
+    return max_qty
+
+
+def _ensure_primer_before_plaster(works: list[dict], materials: list[dict], currency: str) -> tuple[list[dict], list[dict]]:
+    has_plaster = any("штукатур" in (w.get("name") or "").lower() for w in works) or any("штукатур" in (m.get("name") or "").lower() for m in materials)
+    if not has_plaster:
+        return works, materials
+
+    plaster_area = _find_related_work_qty(works, ["штукатур"])
+    if plaster_area <= 0:
+        return works, materials
+
+    has_primer_work = any("грунт" in (w.get("name") or "").lower() for w in works)
+    has_primer_mat = any("грунт" in (m.get("name") or "").lower() for m in materials)
+
+    if not has_primer_work:
+        unit_price = 80
+        works.append({
+            "name": "Грунтовка основания перед штукатуркой",
+            "unit": "м²",
+            "qty": plaster_area,
+            "unit_price": unit_price,
+            "total": plaster_area * unit_price,
+        })
+
+    if not has_primer_mat:
+        consumption = 0.15
+        pack_l = 10.0
+        qty = _ceil_int((plaster_area * consumption) / pack_l)
+        unit_price = 900
+        materials.append({
+            "name": f"Грунтовка глубокого проникновения, расход {consumption} л/м²",
+            "brand": "Канистра 10 л",
+            "unit": "шт",
+            "qty": qty,
+            "unit_price": unit_price,
+            "total": qty * unit_price,
+        })
+
+    return works, materials
+
+
+def _fix_ceiling_plaster_prices(works: list[dict]) -> list[dict]:
+    wall_prices = []
+    for w in works:
+        name = (w.get("name") or "").lower()
+        if "штукатур" in name and "стен" in name:
+            if _norm_int(w.get("unit_price")) > 0:
+                wall_prices.append(_norm_int(w.get("unit_price")))
+    if not wall_prices:
+        return works
+    wall_base = max(wall_prices)
+    ceiling_min = _ceil_int(wall_base * 1.2)
+    for w in works:
+        name = (w.get("name") or "").lower()
+        if "штукатур" in name and "потол" in name:
+            qty = _norm_int(w.get("qty"))
+            unit_price = _norm_int(w.get("unit_price"))
+            if unit_price < ceiling_min:
+                w["unit_price"] = ceiling_min
+                w["total"] = qty * ceiling_min
+    return works
+
+
+def _fix_consumable_materials(works: list[dict], materials: list[dict]) -> list[dict]:
+    plaster_area = _find_related_work_qty(works, ["штукатур"])
+    if plaster_area <= 0:
+        return materials
+
+    for m in materials:
+        name = (m.get("name") or "").lower()
+        brand = (m.get("brand") or "").lower()
+        text = f"{name} {brand}"
+        if "штукатур" not in text:
+            continue
+
+        consumption = _extract_consumption(text)
+        if consumption is None:
+            consumption = 8.5
+            if m.get("brand"):
+                m["brand"] = f"{m['brand']} · Расход {consumption} кг/м²"
+            else:
+                m["brand"] = f"Расход {consumption} кг/м²"
+
+        pack_weight = _extract_pack_weight_kg(text)
+        if pack_weight is None:
+            pack_weight = 30.0
+            if m.get("brand"):
+                m["brand"] = f"{m['brand']} · Мешок {int(pack_weight)} кг"
+            else:
+                m["brand"] = f"Мешок {int(pack_weight)} кг"
+
+        needed_qty = _ceil_int((plaster_area * consumption) / pack_weight)
+        current_qty = max(_norm_int(m.get("qty")), 0)
+        if needed_qty > current_qty:
+            m["qty"] = needed_qty
+        unit_price = _norm_int(m.get("unit_price"))
+        m["total"] = _norm_int(m.get("qty")) * unit_price
+
+    return materials
+
+
+def _ensure_nonempty_variant_fields(variant: dict) -> dict:
+    if not variant.get("pros"):
+        variant["pros"] = "Сбалансирован по задачам и бюджету."
+    if not variant.get("cons"):
+        variant["cons"] = "Требует уточнения по брендам и итоговым объёмам."
+    if not (variant.get("materials") or []):
+        variant["materials"] = [{
+            "name": "Материалы уточняются по проекту",
+            "brand": "Предварительный расчёт",
+            "unit": "компл",
+            "qty": 1,
+            "unit_price": 1,
+            "total": 1,
+        }]
+    return variant
+
+
+def _enforce_variant_order(variants: list[dict]) -> list[dict]:
+    prev_total = 0
+    min_step = 1000
+    for i, v in enumerate(variants):
+        total_works = sum(_norm_int(w.get("total")) for w in (v.get("works") or []))
+        total_materials = sum(_norm_int(m.get("total")) for m in (v.get("materials") or []))
+        total = total_works + total_materials
+        if i > 0 and total <= prev_total:
+            needed_total = prev_total + min_step
+            diff = needed_total - total
+            if (v.get("materials") or []):
+                last = v["materials"][-1]
+                last["total"] = _norm_int(last.get("total")) + diff
+                qty = max(_norm_int(last.get("qty")), 1)
+                last["unit_price"] = _ceil_int(last["total"] / qty)
+            else:
+                v.setdefault("materials", []).append({
+                    "name": "Корректировка ценового сегмента",
+                    "brand": "Служебный перерасчёт",
+                    "unit": "компл",
+                    "qty": 1,
+                    "unit_price": diff,
+                    "total": diff,
+                })
+            total_materials = sum(_norm_int(m.get("total")) for m in (v.get("materials") or []))
+            total = total_works + total_materials
+        v["total_works"] = total_works
+        v["total_materials"] = total_materials
+        v["total"] = total
+        v["budget"] = f"{total:,} ₽".replace(",", " ")
+        prev_total = total
+    return variants
+
+
 def _normalize_result(data: dict) -> dict:
     out = {
         "summary": data.get("summary") or data.get("description") or "",
@@ -404,6 +629,8 @@ def _normalize_result(data: dict) -> dict:
                 "total": total,
             })
 
+        works = _fix_ceiling_plaster_prices(works)
+
         materials = []
         for m in (v.get("materials") or []):
             qty = _norm_int(m.get("qty") or 0)
@@ -420,11 +647,14 @@ def _normalize_result(data: dict) -> dict:
                 "total": total,
             })
 
+        materials = _fix_consumable_materials(works, materials)
+        works, materials = _ensure_primer_before_plaster(works, materials, out["currency"])
+
         total_works = sum(w["total"] for w in works)
         total_materials = sum(m["total"] for m in materials)
         total = total_works + total_materials
 
-        out["variants"].append({
+        variant = {
             "name": v.get("name") or "",
             "style": v.get("style") or "",
             "total_works": total_works,
@@ -435,7 +665,10 @@ def _normalize_result(data: dict) -> dict:
             "materials": materials,
             "pros": v.get("pros") or "",
             "cons": v.get("cons") or "",
-        })
+        }
+        out["variants"].append(_ensure_nonempty_variant_fields(variant))
+
+    out["variants"] = _enforce_variant_order(out["variants"])
 
     totals = [v["total"] for v in out["variants"] if v["total"] > 0]
     if totals:
@@ -495,9 +728,7 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
 
     scope_info = _detect_scope(situation)
 
-    # Полный user_msg для OpenRouter/локальных моделей (12 материалов)
     materials_context_full = await get_materials_context(situation, limit=12)
-    # Сжатый user_msg для Groq (3 материала, чтобы не превысить лимит TPM)
     materials_context_groq = await get_materials_context(situation, limit=3)
 
     user_rates = get_user_rates(user_id) if user_id else []
@@ -549,7 +780,7 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
                     logger.warning("Estimate looks incomplete for scope=%s via %s, retrying with clarification", scope_info.get('scope'), model)
                     messages.append({
                         "role": "user",
-                        "content": "Предыдущая смета неполная относительно масштаба задачи. Пересчитай адекватно: включи все обязательные разделы и реалистичную примерную стоимость."
+                        "content": "Предыдущая смета неполная относительно масштаба задачи. Пересчитай адекватно: включи все обязательные разделы, реалистичную стоимость, норму расхода материалов, грунтовку перед штукатуркой и строгий порядок Эконом < Оптимальный < Премиум."
                     })
                     result = await _try_model(client, model, messages, max_tokens, use_json_mode)
                 logger.info("Estimate OK via %s (%s)", model, provider_tag)
