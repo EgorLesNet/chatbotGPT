@@ -11,19 +11,31 @@ from utils.storage import get_user_rates
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
-Ты — опытный прораб в России. Составь подробную смету ремонта в трёх вариантах: Эконом, Оптимальный, Премиум.
+Ты — опытный прораб-сметчик в России.
+
+Твоя задача — не просто перечислить материалы, а оценить ПРИМЕРНУЮ СТОИМОСТЬ ремонта по смыслу задачи.
+Сначала определи масштаб задачи, потом считай смету.
 
 КРИТИЧЕСКИ ВАЖНО:
-- Вариант Эконом должен быть полностью пригоден для показа клиенту: с полным перечнем работ, материалов и точных цен.
-- Варианты Оптимальный и Премиум тоже считай полностью, НО они нужны как платные апсейл-варианты.
-- Для всех вариантов стоимость работ должна рассчитываться на основе пользовательских расценок мастера, если они переданы во входных данных. Если расценка есть, не придумывай свою цену за работу, а используй её.
-- Если точной расценки на конкретную работу нет, используй ближайший по смыслу ориентир или реалистичную рыночную цену.
-- Материалы подбирай из предоставленного списка материалов. Если список неполный, можно дополнять реалистичными рыночными материалами.
-- Варианты должны отличаться и по материалам, и по итоговой стоимости.
+- Если пользователь описывает полный ремонт квартиры / ремонт под ключ / капитальный ремонт / современный ремонт с инженеркой и сантехникой, нельзя считать это как локальную задачу по полу или одной зоне.
+- Для полного ремонта квартиры обязательно включай основные разделы: демонтаж, стены, полы, потолки, электрика, сантехника, чистовая отделка, сопутствующий монтаж.
+- Для локальных задач считай только относящиеся к ним этапы.
+- Стоимость работ считай по расценкам мастера, если они переданы.
+- Если нужной расценки нет, используй реалистичную рыночную оценку.
+- Материалы подбирай адекватно задаче; не ограничивайся 1–2 позициями, если задача комплексная.
+- Если запрос общий и примерный, допустима укрупнённая смета: не нужно выдумывать сотни позиций, но состав работ должен соответствовать масштабу.
+- Эконом, Оптимальный и Премиум должны различаться не только материалами, но и качеством/объёмом решений.
+- total_works = сумма works.total
+- total_materials = сумма materials.total
+- total = total_works + total_materials
+- cost_min = минимальный total среди вариантов
+- cost_max = максимальный total среди вариантов
+- Никогда не ставь cost_min и cost_max в 0, если варианты посчитаны.
+- Если задача "полный ремонт квартиры", итог не должен выглядеть как локальный частичный ремонт.
 
-Верни JSON строго такого вида:
+Верни ONLY raw JSON:
 {
-  "summary": "Краткое описание работ и сроков",
+  "summary": "",
   "cost_min": 0,
   "cost_max": 0,
   "currency": "₽",
@@ -35,12 +47,8 @@ SYSTEM_PROMPT = """
       "total_materials": 0,
       "total": 0,
       "budget": "",
-      "works": [
-        {"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
-      ],
-      "materials": [
-        {"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
-      ],
+      "works": [{"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
+      "materials": [{"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
       "pros": "",
       "cons": ""
     },
@@ -51,12 +59,8 @@ SYSTEM_PROMPT = """
       "total_materials": 0,
       "total": 0,
       "budget": "",
-      "works": [
-        {"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
-      ],
-      "materials": [
-        {"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
-      ],
+      "works": [{"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
+      "materials": [{"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
       "pros": "",
       "cons": ""
     },
@@ -67,19 +71,14 @@ SYSTEM_PROMPT = """
       "total_materials": 0,
       "total": 0,
       "budget": "",
-      "works": [
-        {"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
-      ],
-      "materials": [
-        {"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
-      ],
+      "works": [{"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
+      "materials": [{"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
       "pros": "",
       "cons": ""
     }
   ],
   "risks": ""
 }
-ONLY raw JSON, no markdown.
 """.strip()
 
 SYSTEM_PROMPT_LOCAL = (
@@ -214,6 +213,73 @@ async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
     return chain
 
 
+def _detect_scope(situation: str) -> dict:
+    s = (situation or "").lower()
+
+    full_markers = [
+        "полный ремонт", "ремонт под ключ", "капитальный ремонт",
+        "современный ремонт", "квартира целиком", "всей квартиры",
+        "с инженер", "с сантехник", "электрик", "чернов", "чистов",
+    ]
+    floor_markers = ["пол", "стяжк", "кварцвинил", "ламинат", "плитк", "линолеум"]
+    bath_markers = ["ванн", "сануз", "туалет", "душ"]
+    paint_markers = ["покраск", "обои", "шпаклев", "штукатур"]
+
+    if any(x in s for x in full_markers):
+        return {
+            "scope": "full_apartment",
+            "required_sections": [
+                "демонтаж",
+                "черновые стены",
+                "черновые полы",
+                "электрика",
+                "сантехника",
+                "чистовая отделка стен",
+                "чистовые полы",
+                "потолки",
+                "двери/плинтусы/фурнитура",
+            ],
+        }
+
+    if any(x in s for x in bath_markers):
+        return {
+            "scope": "bathroom",
+            "required_sections": [
+                "демонтаж",
+                "сантехника",
+                "гидроизоляция",
+                "плиточные работы",
+                "чистовой монтаж",
+            ],
+        }
+
+    if any(x in s for x in floor_markers):
+        return {
+            "scope": "floor_only",
+            "required_sections": [
+                "демонтаж",
+                "подготовка основания",
+                "стяжка/выравнивание",
+                "финишное покрытие",
+            ],
+        }
+
+    if any(x in s for x in paint_markers):
+        return {
+            "scope": "walls_finish",
+            "required_sections": [
+                "подготовка",
+                "выравнивание",
+                "финишная отделка",
+            ],
+        }
+
+    return {
+        "scope": "generic",
+        "required_sections": [],
+    }
+
+
 def _build_rates_context(user_rates: list[dict]) -> str:
     if not user_rates:
         return ""
@@ -225,16 +291,36 @@ def _build_rates_context(user_rates: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _build_user_message(situation: str, project: dict | None, materials_context: str, rates_context: str) -> str:
+def _build_user_message(
+    situation: str,
+    project: dict | None,
+    materials_context: str,
+    rates_context: str,
+    scope_info: dict,
+) -> str:
     parts = [f"Ситуация: {situation}"]
+
     if project:
-        parts.append(f"Объект: {project.get('title', '')}, тип: {project.get('project_type', '')}, {project.get('area_m2', '')} м²")
+        parts.append(
+            f"Объект: {project.get('title', '')}, тип: {project.get('project_type', '')}, {project.get('area_m2', '')} м²"
+        )
         if project.get("notes"):
             parts.append(f"Заметки: {project['notes']}")
+
+    parts.append(f"Определённый тип задачи: {scope_info.get('scope', 'generic')}")
+
+    required_sections = scope_info.get("required_sections") or []
+    if required_sections:
+        parts.append("Обязательные разделы сметы:")
+        for item in required_sections:
+            parts.append(f"- {item}")
+
     if rates_context:
         parts.append(rates_context)
+
     if materials_context:
         parts.append(materials_context)
+
     return "\n".join(parts)
 
 
@@ -281,35 +367,49 @@ def _norm_int(val) -> int:
 def _normalize_result(data: dict) -> dict:
     out = {
         "summary": data.get("summary") or data.get("description") or "",
-        "cost_min": _norm_int(data.get("cost_min") or data.get("min_cost") or 0),
-        "cost_max": _norm_int(data.get("cost_max") or data.get("max_cost") or 0),
+        "cost_min": 0,
+        "cost_max": 0,
         "currency": data.get("currency") or "₽",
         "risks": data.get("risks") or data.get("notes") or "",
         "variants": [],
     }
+
     for v in (data.get("variants") or data.get("options") or [])[:3]:
         works = []
         for w in (v.get("works") or []):
+            qty = _norm_int(w.get("qty") or 0)
+            unit_price = _norm_int(w.get("unit_price") or 0)
+            total = _norm_int(w.get("total") or 0)
+            if total <= 0 and qty > 0 and unit_price > 0:
+                total = qty * unit_price
             works.append({
                 "name": w.get("name") or "",
                 "unit": w.get("unit") or "",
-                "qty": _norm_int(w.get("qty") or 0),
-                "unit_price": _norm_int(w.get("unit_price") or 0),
-                "total": _norm_int(w.get("total") or 0),
+                "qty": qty,
+                "unit_price": unit_price,
+                "total": total,
             })
+
         materials = []
         for m in (v.get("materials") or []):
+            qty = _norm_int(m.get("qty") or 0)
+            unit_price = _norm_int(m.get("unit_price") or 0)
+            total = _norm_int(m.get("total") or 0)
+            if total <= 0 and qty > 0 and unit_price > 0:
+                total = qty * unit_price
             materials.append({
                 "name": m.get("name") or "",
                 "brand": m.get("brand") or "",
                 "unit": m.get("unit") or "",
-                "qty": _norm_int(m.get("qty") or 0),
-                "unit_price": _norm_int(m.get("unit_price") or 0),
-                "total": _norm_int(m.get("total") or 0),
+                "qty": qty,
+                "unit_price": unit_price,
+                "total": total,
             })
-        total_works = _norm_int(v.get("total_works") or sum(w["total"] for w in works))
-        total_materials = _norm_int(v.get("total_materials") or sum(m["total"] for m in materials))
-        total = _norm_int(v.get("total") or total_works + total_materials)
+
+        total_works = sum(w["total"] for w in works)
+        total_materials = sum(m["total"] for m in materials)
+        total = total_works + total_materials
+
         out["variants"].append({
             "name": v.get("name") or "",
             "style": v.get("style") or "",
@@ -322,7 +422,38 @@ def _normalize_result(data: dict) -> dict:
             "pros": v.get("pros") or "",
             "cons": v.get("cons") or "",
         })
+
+    totals = [v["total"] for v in out["variants"] if v["total"] > 0]
+    if totals:
+        out["cost_min"] = min(totals)
+        out["cost_max"] = max(totals)
+    else:
+        out["cost_min"] = _norm_int(data.get("cost_min") or data.get("min_cost") or 0)
+        out["cost_max"] = _norm_int(data.get("cost_max") or data.get("max_cost") or 0)
+
     return out
+
+
+def _estimate_looks_incomplete(result: dict, scope_info: dict) -> bool:
+    scope = scope_info.get("scope")
+    variants = result.get("variants") or []
+    if not variants:
+        return True
+
+    first = variants[0]
+    works_count = len(first.get("works") or [])
+    mats_count = len(first.get("materials") or [])
+
+    if scope == "full_apartment":
+        return works_count < 8 or mats_count < 5 or first.get("total", 0) < 250000
+
+    if scope == "bathroom":
+        return works_count < 5 or mats_count < 4
+
+    if scope == "floor_only":
+        return works_count < 3 or mats_count < 2
+
+    return False
 
 
 def _parse_retry_after(exc: RateLimitError) -> float:
@@ -348,16 +479,23 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
     if not model_chain:
         raise RuntimeError("Нет доступных моделей")
 
-    materials_context = await get_materials_context(situation, limit=5)
+    scope_info = _detect_scope(situation)
+    materials_context = await get_materials_context(situation, limit=12)
     user_rates = get_user_rates(user_id) if user_id else []
     rates_context = _build_rates_context(user_rates)
-    user_msg = _build_user_message(situation, project, materials_context, rates_context)
+    user_msg = _build_user_message(
+        situation=situation,
+        project=project,
+        materials_context=materials_context,
+        rates_context=rates_context,
+        scope_info=scope_info,
+    )
 
     for model, base_url in model_chain:
         local = _is_local(base_url)
         groq = _is_groq(base_url)
         system_prompt = SYSTEM_PROMPT_LOCAL if local else SYSTEM_PROMPT
-        max_tokens = 1400 if local else 3200
+        max_tokens = 2200 if local else 5200
         use_json_mode = local or groq
         client = _make_client(base_url, api_key)
         messages = [
@@ -370,6 +508,13 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
         for attempt, delay in enumerate(RETRY_DELAYS, start=1):
             try:
                 result = await _try_model(client, model, messages, max_tokens, use_json_mode)
+                if _estimate_looks_incomplete(result, scope_info):
+                    logger.warning("Estimate looks incomplete for scope=%s via %s, retrying with clarification", scope_info.get('scope'), model)
+                    messages.append({
+                        "role": "user",
+                        "content": "Предыдущая смета неполная относительно масштаба задачи. Пересчитай адекватно: включи все обязательные разделы и реалистичную примерную стоимость."
+                    })
+                    result = await _try_model(client, model, messages, max_tokens, use_json_mode)
                 logger.info("Estimate OK via %s (%s)", model, provider_tag)
                 return result
             except NotFoundError:
