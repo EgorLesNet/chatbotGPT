@@ -9,38 +9,104 @@ from utils.materials_db import get_materials_context
 
 logger = logging.getLogger(__name__)
 
+# Подробный промпт — разбивка по работам и материалам
 SYSTEM_PROMPT = """
-Ты — опытный помощник прораба. Твоя задача — по описанию ситуации клиента дать чёткую профессиональную оценку.
-Если предоставлены данные о материалах — используй их для точных цен в смете.
+Ты — опытный прораб в России. Составь подробную смету ремонта в трёх вариантах (Эконом, Оптимальный, Премиум).
 
-Формат ответа СТРОГО в JSON (no markdown blocks):
+Для каждого варианта составь:
+1. Перечень работ с ценой за единицу и количеством (например: демонтаж покрытия 50 м² × 300 ₽ = 15 000 ₽)
+2. Перечень материалов с ценой за единицу, количеством и итогом (например: кварцвинил 6 мм 50 м² × 900 ₽ = 45 000 ₽)
+3. Итог: стоимость работ + стоимость материалов = полный бюджет
+
+Цены реалистичные для России (Москва/регионы). Материалы — реальные торговые позиции (Леруа Мерлен, Цересит, ОБИ, Петрович, Цересит, Намвина, Касторама, Атак, аналоги с популярных российских сайтов).
+Варианты должны реально различаться по классу материалов и цене, не повторять один и тот же материал.
+
+JSON-шаблон (строго соблюдать, no markdown, ONLY raw JSON):
 {
-  "summary": "Краткое описание работ (2-3 предложения)",
-  "cost_min": 50000,
-  "cost_max": 80000,
+  "summary": "Краткое описание работ и сроков (2-3 предложения)",
+  "cost_min": 120000,
+  "cost_max": 220000,
   "currency": "₽",
   "variants": [
-    {"name": "Эконом", "budget": "50 000 – 60 000 ₽", "style": "Простой",
-     "materials": [{"name": "", "price": "", "note": ""}], "pros": "", "cons": ""},
-    {"name": "Оптимальный", "budget": "65 000 – 75 000 ₽", "style": "Современный",
-     "materials": [{"name": "", "price": "", "note": ""}], "pros": "", "cons": ""},
-    {"name": "Премиум", "budget": "75 000 – 90 000 ₽", "style": "Дизайнерский",
-     "materials": [{"name": "", "price": "", "note": ""}], "pros": "", "cons": ""}
+    {
+      "name": "Эконом",
+      "style": "Бюджетный",
+      "total_works": 45000,
+      "total_materials": 60000,
+      "total": 105000,
+      "budget": "105 000 ₽",
+      "works": [
+        {"name": "Демонтаж покрытия", "unit": "м²", "qty": 50, "unit_price": 300, "total": 15000},
+        {"name": "Стяжка пола", "unit": "м²", "qty": 50, "unit_price": 600, "total": 30000}
+      ],
+      "materials": [
+        {"name": "Кварцвинил 4 мм, Эконом", "brand": "Цересит", "unit": "м²", "qty": 55, "unit_price": 700, "total": 38500},
+        {"name": "Подложка под ламинат", "brand": "Пенотекс", "unit": "м²", "qty": 55, "unit_price": 150, "total": 8250},
+        {"name": "Плинтус пластиковый", "brand": "Атак", "unit": "п.m.", "qty": 25, "unit_price": 50, "total": 1250}
+      ],
+      "pros": "Минимальные затраты, быстрый срок",
+      "cons": "Бюджетные материалы, меньше выбор дизайна"
+    },
+    {
+      "name": "Оптимальный",
+      "style": "Современный",
+      "total_works": 55000,
+      "total_materials": 100000,
+      "total": 155000,
+      "budget": "155 000 ₽",
+      "works": [
+        {"name": "Демонтаж покрытия", "unit": "м²", "qty": 50, "unit_price": 300, "total": 15000},
+        {"name": "Стяжка + грунтовка", "unit": "м²", "qty": 50, "unit_price": 800, "total": 40000}
+      ],
+      "materials": [
+        {"name": "Кварцвинил 6 мм", "brand": "Петрович", "unit": "м²", "qty": 55, "unit_price": 1100, "total": 60500},
+        {"name": "Самовыравнивающаяся стяжка Knauf", "brand": "Knauf", "unit": "м²", "qty": 50, "unit_price": 450, "total": 22500},
+        {"name": "Плинтус мдф", "brand": "Леруа Мерлен", "unit": "п.m.", "qty": 25, "unit_price": 200, "total": 5000}
+      ],
+      "pros": "Хорошее соотношение цена/качество",
+      "cons": "Дольше срок из-за стяжки"
+    },
+    {
+      "name": "Премиум",
+      "style": "Дизайнерский",
+      "total_works": 70000,
+      "total_materials": 150000,
+      "total": 220000,
+      "budget": "220 000 ₽",
+      "works": [
+        {"name": "Демонтаж + вывоз мусора", "unit": "м²", "qty": 50, "unit_price": 400, "total": 20000},
+        {"name": "Стяжка полусухая премиум", "unit": "м²", "qty": 50, "unit_price": 1000, "total": 50000}
+      ],
+      "materials": [
+        {"name": "Керамогранит имитация камня 60x60", "brand": "Керама/Atlas", "unit": "м²", "qty": 55, "unit_price": 1800, "total": 99000},
+        {"name": "Клей плиточный флекс", "brand": "Цересит", "unit": "кг", "qty": 20, "unit_price": 600, "total": 12000},
+        {"name": "Затирка цветная", "brand": "Лютомер", "unit": "кг", "qty": 10, "unit_price": 400, "total": 4000}
+      ],
+      "pros": "Высокое качество, долговечность",
+      "cons": "Высокая цена, дольший срок"
+    }
   ],
   "risks": "Что важно учесть прорабу"
 }
-Правила: цены реалистичные для России. ONLY raw JSON, no text before or after.
+
+ONLY raw JSON, no text before or after.
 """.strip()
 
 SYSTEM_PROMPT_LOCAL = (
-    "Отвечай ONLY чистым JSON без комментариев. "
-    "Ты прораб в России. Составь смету ремонта с реальными ценами в рублях. "
-    "Верни JSON с полями: "
-    '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽",'
-    '"variants":['
-    '{"name":"Эконом","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},'
-    '{"name":"Оптимальный","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""},'
-    '{"name":"Премиум","budget":"","style":"","materials":[{"name":"","price":"","note":""}],"pros":"","cons":""}'
+    "Отвечай ONLY чистым JSON. Ты прораб в России. Составь смету с разбивкой по работам и материалам. "
+    'Верни JSON: {"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
+    '{"name":"Эконом","style":"","total_works":0,"total_materials":0,"total":0,"budget":"",'
+    '"works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],'
+    '"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],'
+    '"pros":"","cons":""},'
+    '{"name":"Оптимальный","style":"","total_works":0,"total_materials":0,"total":0,"budget":"",'
+    '"works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],'
+    '"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],'
+    '"pros":"","cons":""},'
+    '{"name":"Премиум","style":"","total_works":0,"total_materials":0,"total":0,"budget":"",'
+    '"works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],'
+    '"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],'
+    '"pros":"","cons":""}'
     '],"risks":""}'
 )
 
@@ -48,8 +114,6 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 LLAMACPP_DEFAULT_URL = "http://localhost:11434"
 
-# Модели Groq — быстрые, бесплатные на бесплатном тарифе
-# Можно задать через GROQ_MODEL в .env
 GROQ_DEFAULT_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
@@ -98,7 +162,6 @@ async def _check_llamacpp() -> tuple[str, str] | None:
 
 
 def _get_groq_models() -> list[tuple[str, str]]:
-    """Вернуть список (model, GROQ_BASE_URL) если GROQ_API_KEY задан."""
     if not os.getenv("GROQ_API_KEY", "").strip():
         return []
     custom = os.getenv("GROQ_MODEL", "").strip()
@@ -156,26 +219,17 @@ def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
 
 async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
     chain: list[tuple[str, str]] = []
-
-    # 1. Groq — первый, самый быстрый облачный провайдер
     for groq_entry in _get_groq_models():
         chain.append(groq_entry)
-
-    # 2. Локальная llama.cpp (если запущена) — второй вариант
     local = await _check_llamacpp()
     if local:
         chain.append(local)
-
-    # 3. Приоритетная модель OpenRouter (если задана)
     primary = os.getenv("OPENROUTER_MODEL", "").strip()
     if primary:
         chain.append((primary, OPENROUTER_BASE_URL))
-
-    # 4. Бесплатные модели OpenRouter — последний fallback
     for m in await fetch_free_models(api_key):
         if not any(m == c[0] for c in chain):
             chain.append((m, OPENROUTER_BASE_URL))
-
     if not chain:
         logger.error("No models available")
     return chain
@@ -193,16 +247,11 @@ def _build_user_message(situation: str, project: dict | None, materials_context:
 
 
 def _clean_json(raw: str) -> str:
-    # 1. Убрать <think>...</think> блоки (Qwen/DeepSeek reasoning)
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
     raw = raw.strip()
-
-    # 2. Вырезать fenced-блоки ```json ... ``` или ``` ... ```
     raw = re.sub(r"```(?:json)?\s*", "", raw)
     raw = raw.replace("```", "")
     raw = raw.strip()
-
-    # 3. Найти первый '{' и извлечь первый сбалансированный JSON-объект
     start = raw.find("{")
     if start == -1:
         return raw
@@ -230,25 +279,56 @@ def _clean_json(raw: str) -> str:
     return raw[start:]
 
 
+def _norm_int(val) -> int:
+    try:
+        return int(float(str(val).replace(" ", "").replace(",", ".")))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _normalize_result(data: dict) -> dict:
-    """Привести результат к ожидаемой схеме summary/cost_min/cost_max/currency/variants/risks."""
     out = {
-        "summary":  data.get("summary") or data.get("description") or "",
-        "cost_min": int(data.get("cost_min") or data.get("min_cost") or 0),
-        "cost_max": int(data.get("cost_max") or data.get("max_cost") or 0),
-        "currency": data.get("currency") or "₽",
-        "risks":    data.get("risks") or data.get("notes") or "",
-        "variants": [],
+        "summary":         data.get("summary") or data.get("description") or "",
+        "cost_min":        _norm_int(data.get("cost_min") or data.get("min_cost") or 0),
+        "cost_max":        _norm_int(data.get("cost_max") or data.get("max_cost") or 0),
+        "currency":        data.get("currency") or "₽",
+        "risks":           data.get("risks") or data.get("notes") or "",
+        "variants":        [],
     }
-    raw_variants = data.get("variants") or data.get("options") or []
-    for v in raw_variants[:3]:
+    for v in (data.get("variants") or data.get("options") or [])[:3]:
+        works = []
+        for w in (v.get("works") or []):
+            works.append({
+                "name":       w.get("name") or "",
+                "unit":       w.get("unit") or "",
+                "qty":        _norm_int(w.get("qty") or 0),
+                "unit_price": _norm_int(w.get("unit_price") or 0),
+                "total":      _norm_int(w.get("total") or 0),
+            })
+        materials = []
+        for m in (v.get("materials") or []):
+            materials.append({
+                "name":       m.get("name") or "",
+                "brand":      m.get("brand") or "",
+                "unit":       m.get("unit") or "",
+                "qty":        _norm_int(m.get("qty") or 0),
+                "unit_price": _norm_int(m.get("unit_price") or 0),
+                "total":      _norm_int(m.get("total") or 0),
+            })
+        total_works     = _norm_int(v.get("total_works") or sum(w["total"] for w in works))
+        total_materials = _norm_int(v.get("total_materials") or sum(m["total"] for m in materials))
+        total           = _norm_int(v.get("total") or total_works + total_materials)
         out["variants"].append({
-            "name":      v.get("name") or "",
-            "budget":    v.get("budget") or v.get("price") or "",
-            "style":     v.get("style") or "",
-            "materials": v.get("materials") or [],
-            "pros":      v.get("pros") or "",
-            "cons":      v.get("cons") or "",
+            "name":             v.get("name") or "",
+            "style":            v.get("style") or "",
+            "total_works":      total_works,
+            "total_materials":  total_materials,
+            "total":            total,
+            "budget":           v.get("budget") or f"{total:,} ₽".replace(",", " "),
+            "works":            works,
+            "materials":        materials,
+            "pros":             v.get("pros") or "",
+            "cons":             v.get("cons") or "",
         })
     return out
 
@@ -264,7 +344,7 @@ async def _try_model(
     client: AsyncOpenAI, model: str, messages: list,
     max_tokens: int, use_json_mode: bool
 ) -> dict:
-    kwargs: dict = dict(model=model, messages=messages, temperature=0.4, max_tokens=max_tokens)
+    kwargs: dict = dict(model=model, messages=messages, temperature=0.3, max_tokens=max_tokens)
     if use_json_mode:
         kwargs["response_format"] = {"type": "json_object"}
     response = await client.chat.completions.create(**kwargs)
@@ -276,7 +356,6 @@ async def _try_model(
 async def get_estimate(situation: str, project: dict | None = None) -> dict:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     model_chain = await _get_model_chain(api_key)
-
     if not model_chain:
         raise RuntimeError("Нет доступных моделей")
 
@@ -285,15 +364,15 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
 
     for model, base_url in model_chain:
         local = _is_local(base_url)
-        groq = _is_groq(base_url)
+        groq  = _is_groq(base_url)
         system_prompt = SYSTEM_PROMPT_LOCAL if local else SYSTEM_PROMPT
-        max_tokens = 800 if local else 1800
-        # json_object: работает в llama.cpp >= b2963 и Groq
+        # Больше токенов — подробная смета длиннее
+        max_tokens = 1200 if local else 3000
         use_json_mode = local or groq
         client = _make_client(base_url, api_key)
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_msg},
+            {"role": "user",   "content": user_msg},
         ]
         json_attempts = 0
         provider_tag = "local" if local else ("groq" if groq else "openrouter")
@@ -303,12 +382,10 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 result = await _try_model(client, model, messages, max_tokens, use_json_mode)
                 logger.info("Estimate OK via %s (%s)", model, provider_tag)
                 return result
-
             except NotFoundError:
                 logger.warning("Model not found: %s", model)
                 _free_models_cache.clear()
                 break
-
             except RateLimitError as exc:
                 wait = _parse_retry_after(exc)
                 if wait <= MAX_RATE_LIMIT_WAIT and attempt < len(RETRY_DELAYS):
@@ -317,7 +394,6 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 else:
                     logger.warning("Rate limit too long (%.0fs) on %s, skipping", wait, model)
                     break
-
             except (APITimeoutError, APIConnectionError):
                 if attempt < len(RETRY_DELAYS):
                     logger.warning("Timeout on %s, retrying in %ds", model, delay)
@@ -325,7 +401,6 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 else:
                     logger.warning("All retries failed for %s", model)
                     break
-
             except json.JSONDecodeError:
                 json_attempts += 1
                 if json_attempts < JSON_MAX_RETRIES:
