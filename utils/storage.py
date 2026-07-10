@@ -9,6 +9,12 @@ DB_DIR = BASE_DIR / "db"
 USERS_DIR = DB_DIR / "users"
 MATERIALS_FILE = DB_DIR / "materials.json"
 
+DEFAULT_RATE_PRESETS = [
+    {"name": "Демонтаж покрытия", "unit": "м²", "unit_price": 300, "note": "базовый ориентир"},
+    {"name": "Стяжка пола", "unit": "м²", "unit_price": 750, "note": "работа без материала"},
+    {"name": "Укладка кварцвинила", "unit": "м²", "unit_price": 650, "note": "на готовое основание"},
+]
+
 
 def ensure_dirs() -> None:
     USERS_DIR.mkdir(parents=True, exist_ok=True)
@@ -48,6 +54,12 @@ def ensure_user(telegram_user) -> dict:
     user_id = telegram_user.id
     existing = get_user(user_id)
     if existing:
+        changed = False
+        if "rate_presets" not in existing:
+            existing["rate_presets"] = DEFAULT_RATE_PRESETS.copy()
+            changed = True
+        if changed:
+            save_user(existing)
         return existing
     payload = {
         "id": user_id,
@@ -58,6 +70,7 @@ def ensure_user(telegram_user) -> dict:
         "projects": [],
         "usage": {"month": _current_month_key(), "projects_created": 0},
         "preferences": {"voice_enabled": False, "pdf_enabled": False},
+        "rate_presets": DEFAULT_RATE_PRESETS.copy(),
     }
     save_user(payload)
     return payload
@@ -113,10 +126,20 @@ def get_user_summary(user_id: int) -> dict:
     }
 
 
+def get_user_rates(user_id: int) -> list[dict]:
+    user = get_user(user_id)
+    rates = user.get("rate_presets") or DEFAULT_RATE_PRESETS.copy()
+    return rates
+
+
+def save_user_rates(user_id: int, rates: list[dict]) -> list[dict]:
+    user = get_user(user_id)
+    user["rate_presets"] = rates
+    save_user(user)
+    return rates
+
+
 def _load_materials() -> list[dict]:
-    """Load materials list from db/materials.json.
-    Supports both old format (plain list) and new format ({meta, items}).
-    """
     raw = _read_json(MATERIALS_FILE, [])
     if isinstance(raw, list):
         return raw
@@ -130,8 +153,4 @@ def suggest_materials(limit: int = 1) -> list[dict]:
 
 
 def list_rate_presets() -> list[dict]:
-    return [
-        {"name": "Штукатурка стен", "unit": "м²", "unit_price": 550, "note": "работа без материала"},
-        {"name": "Стяжка пола", "unit": "м²", "unit_price": 750, "note": "базовый ориентир"},
-        {"name": "Покраска потолка", "unit": "м²", "unit_price": 320, "note": "в 2 слоя"},
-    ]
+    return DEFAULT_RATE_PRESETS.copy()

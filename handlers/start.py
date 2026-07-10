@@ -14,15 +14,17 @@ async def cmd_start(message: Message) -> None:
     reset_user_month(user["id"])
     limits = get_plan_limits(user)
     await message.answer(
-        "👷 <b>Прораб-Бот</b> — помощник по проектам, расценкам и материалам.\n\n"
+        "👷 <b>Прораб-Бот</b> — помощник по проектам, расценкам и сметам.\n\n"
         f"Текущий план: <b>{get_plan_name(user)}</b>\n"
         f"Проектов в месяц: <b>{limits['projects_per_month_label']}</b>\n"
         f"Вариантов материалов на запрос: <b>{limits['material_options']}</b>\n\n"
         "Команды:\n"
-        "/estimate — 🔥 описать ситуацию клиента → смета + 3 варианта материалов\n"
+        "/estimate — описать ситуацию клиента → смета\n"
         "/project — создать или посмотреть проект\n"
-        "/rates — ориентиры по расценкам\n"
-        "/materials — подобрать материалы из базы\n"
+        "/rates — мои расценки на работы\n"
+        "/rates_add — добавить расценку\n"
+        "/rates_edit — изменить расценку\n"
+        "/rates_delete — удалить расценку\n"
         "/subscribe — статус подписки\n"
         "/voice — голосовой режим (заготовка)"
     )

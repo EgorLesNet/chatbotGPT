@@ -6,107 +6,89 @@ import re
 import httpx
 from openai import AsyncOpenAI, APITimeoutError, APIConnectionError, NotFoundError, RateLimitError
 from utils.materials_db import get_materials_context
+from utils.storage import get_user_rates
 
 logger = logging.getLogger(__name__)
 
-# Подробный промпт — разбивка по работам и материалам
 SYSTEM_PROMPT = """
-Ты — опытный прораб в России. Составь подробную смету ремонта в трёх вариантах (Эконом, Оптимальный, Премиум).
+Ты — опытный прораб в России. Составь подробную смету ремонта в трёх вариантах: Эконом, Оптимальный, Премиум.
 
-Для каждого варианта составь:
-1. Перечень работ с ценой за единицу и количеством (например: демонтаж покрытия 50 м² × 300 ₽ = 15 000 ₽)
-2. Перечень материалов с ценой за единицу, количеством и итогом (например: кварцвинил 6 мм 50 м² × 900 ₽ = 45 000 ₽)
-3. Итог: стоимость работ + стоимость материалов = полный бюджет
+КРИТИЧЕСКИ ВАЖНО:
+- Вариант Эконом должен быть полностью пригоден для показа клиенту: с полным перечнем работ, материалов и точных цен.
+- Варианты Оптимальный и Премиум тоже считай полностью, НО они нужны как платные апсейл-варианты.
+- Для всех вариантов стоимость работ должна рассчитываться на основе пользовательских расценок мастера, если они переданы во входных данных. Если расценка есть, не придумывай свою цену за работу, а используй её.
+- Если точной расценки на конкретную работу нет, используй ближайший по смыслу ориентир или реалистичную рыночную цену.
+- Материалы подбирай из предоставленного списка материалов. Если список неполный, можно дополнять реалистичными рыночными материалами.
+- Варианты должны отличаться и по материалам, и по итоговой стоимости.
 
-Цены реалистичные для России (Москва/регионы). Материалы — реальные торговые позиции (Леруа Мерлен, Цересит, ОБИ, Петрович, Цересит, Намвина, Касторама, Атак, аналоги с популярных российских сайтов).
-Варианты должны реально различаться по классу материалов и цене, не повторять один и тот же материал.
-
-JSON-шаблон (строго соблюдать, no markdown, ONLY raw JSON):
+Верни JSON строго такого вида:
 {
-  "summary": "Краткое описание работ и сроков (2-3 предложения)",
-  "cost_min": 120000,
-  "cost_max": 220000,
+  "summary": "Краткое описание работ и сроков",
+  "cost_min": 0,
+  "cost_max": 0,
   "currency": "₽",
   "variants": [
     {
       "name": "Эконом",
       "style": "Бюджетный",
-      "total_works": 45000,
-      "total_materials": 60000,
-      "total": 105000,
-      "budget": "105 000 ₽",
+      "total_works": 0,
+      "total_materials": 0,
+      "total": 0,
+      "budget": "",
       "works": [
-        {"name": "Демонтаж покрытия", "unit": "м²", "qty": 50, "unit_price": 300, "total": 15000},
-        {"name": "Стяжка пола", "unit": "м²", "qty": 50, "unit_price": 600, "total": 30000}
+        {"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
       ],
       "materials": [
-        {"name": "Кварцвинил 4 мм, Эконом", "brand": "Цересит", "unit": "м²", "qty": 55, "unit_price": 700, "total": 38500},
-        {"name": "Подложка под ламинат", "brand": "Пенотекс", "unit": "м²", "qty": 55, "unit_price": 150, "total": 8250},
-        {"name": "Плинтус пластиковый", "brand": "Атак", "unit": "п.m.", "qty": 25, "unit_price": 50, "total": 1250}
+        {"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
       ],
-      "pros": "Минимальные затраты, быстрый срок",
-      "cons": "Бюджетные материалы, меньше выбор дизайна"
+      "pros": "",
+      "cons": ""
     },
     {
       "name": "Оптимальный",
-      "style": "Современный",
-      "total_works": 55000,
-      "total_materials": 100000,
-      "total": 155000,
-      "budget": "155 000 ₽",
+      "style": "Средний",
+      "total_works": 0,
+      "total_materials": 0,
+      "total": 0,
+      "budget": "",
       "works": [
-        {"name": "Демонтаж покрытия", "unit": "м²", "qty": 50, "unit_price": 300, "total": 15000},
-        {"name": "Стяжка + грунтовка", "unit": "м²", "qty": 50, "unit_price": 800, "total": 40000}
+        {"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
       ],
       "materials": [
-        {"name": "Кварцвинил 6 мм", "brand": "Петрович", "unit": "м²", "qty": 55, "unit_price": 1100, "total": 60500},
-        {"name": "Самовыравнивающаяся стяжка Knauf", "brand": "Knauf", "unit": "м²", "qty": 50, "unit_price": 450, "total": 22500},
-        {"name": "Плинтус мдф", "brand": "Леруа Мерлен", "unit": "п.m.", "qty": 25, "unit_price": 200, "total": 5000}
+        {"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
       ],
-      "pros": "Хорошее соотношение цена/качество",
-      "cons": "Дольше срок из-за стяжки"
+      "pros": "",
+      "cons": ""
     },
     {
       "name": "Премиум",
       "style": "Дизайнерский",
-      "total_works": 70000,
-      "total_materials": 150000,
-      "total": 220000,
-      "budget": "220 000 ₽",
+      "total_works": 0,
+      "total_materials": 0,
+      "total": 0,
+      "budget": "",
       "works": [
-        {"name": "Демонтаж + вывоз мусора", "unit": "м²", "qty": 50, "unit_price": 400, "total": 20000},
-        {"name": "Стяжка полусухая премиум", "unit": "м²", "qty": 50, "unit_price": 1000, "total": 50000}
+        {"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
       ],
       "materials": [
-        {"name": "Керамогранит имитация камня 60x60", "brand": "Керама/Atlas", "unit": "м²", "qty": 55, "unit_price": 1800, "total": 99000},
-        {"name": "Клей плиточный флекс", "brand": "Цересит", "unit": "кг", "qty": 20, "unit_price": 600, "total": 12000},
-        {"name": "Затирка цветная", "brand": "Лютомер", "unit": "кг", "qty": 10, "unit_price": 400, "total": 4000}
+        {"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}
       ],
-      "pros": "Высокое качество, долговечность",
-      "cons": "Высокая цена, дольший срок"
+      "pros": "",
+      "cons": ""
     }
   ],
-  "risks": "Что важно учесть прорабу"
+  "risks": ""
 }
-
-ONLY raw JSON, no text before or after.
+ONLY raw JSON, no markdown.
 """.strip()
 
 SYSTEM_PROMPT_LOCAL = (
-    "Отвечай ONLY чистым JSON. Ты прораб в России. Составь смету с разбивкой по работам и материалам. "
-    'Верни JSON: {"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
-    '{"name":"Эконом","style":"","total_works":0,"total_materials":0,"total":0,"budget":"",'
-    '"works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],'
-    '"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],'
-    '"pros":"","cons":""},'
-    '{"name":"Оптимальный","style":"","total_works":0,"total_materials":0,"total":0,"budget":"",'
-    '"works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],'
-    '"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],'
-    '"pros":"","cons":""},'
-    '{"name":"Премиум","style":"","total_works":0,"total_materials":0,"total":0,"budget":"",'
-    '"works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],'
-    '"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],'
-    '"pros":"","cons":""}'
+    "Отвечай ONLY чистым JSON. Смета ремонта в РФ в 3 вариантах. "
+    "Используй расценки мастера на работы, если они переданы. "
+    '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
+    '{"name":"Эконом","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
+    '{"name":"Оптимальный","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
+    '{"name":"Премиум","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""}'
     '],"risks":""}'
 )
 
@@ -127,10 +109,7 @@ RETRY_DELAYS = [3, 10]
 MAX_RATE_LIMIT_WAIT = 30
 JSON_MAX_RETRIES = 2
 
-_BLOCKLIST_KEYWORDS = [
-    "content-safety", "moderation", "guard", "embedding",
-    "rerank", "classify", "whisper", "tts",
-]
+_BLOCKLIST_KEYWORDS = ["content-safety", "moderation", "guard", "embedding", "rerank", "classify", "whisper", "tts"]
 _free_models_cache: list[str] = []
 
 
@@ -235,12 +214,25 @@ async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
     return chain
 
 
-def _build_user_message(situation: str, project: dict | None, materials_context: str) -> str:
+def _build_rates_context(user_rates: list[dict]) -> str:
+    if not user_rates:
+        return ""
+    lines = ["Расценки мастера по работам (используй их в первую очередь):"]
+    for item in user_rates:
+        lines.append(
+            f"- {item.get('name','')}: {item.get('unit_price',0)} ₽/{item.get('unit','')} ({item.get('note','')})"
+        )
+    return "\n".join(lines)
+
+
+def _build_user_message(situation: str, project: dict | None, materials_context: str, rates_context: str) -> str:
     parts = [f"Ситуация: {situation}"]
     if project:
         parts.append(f"Объект: {project.get('title', '')}, тип: {project.get('project_type', '')}, {project.get('area_m2', '')} м²")
         if project.get("notes"):
             parts.append(f"Заметки: {project['notes']}")
+    if rates_context:
+        parts.append(rates_context)
     if materials_context:
         parts.append(materials_context)
     return "\n".join(parts)
@@ -275,7 +267,7 @@ def _clean_json(raw: str) -> str:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                return raw[start: i + 1]
+                return raw[start:i + 1]
     return raw[start:]
 
 
@@ -288,47 +280,47 @@ def _norm_int(val) -> int:
 
 def _normalize_result(data: dict) -> dict:
     out = {
-        "summary":         data.get("summary") or data.get("description") or "",
-        "cost_min":        _norm_int(data.get("cost_min") or data.get("min_cost") or 0),
-        "cost_max":        _norm_int(data.get("cost_max") or data.get("max_cost") or 0),
-        "currency":        data.get("currency") or "₽",
-        "risks":           data.get("risks") or data.get("notes") or "",
-        "variants":        [],
+        "summary": data.get("summary") or data.get("description") or "",
+        "cost_min": _norm_int(data.get("cost_min") or data.get("min_cost") or 0),
+        "cost_max": _norm_int(data.get("cost_max") or data.get("max_cost") or 0),
+        "currency": data.get("currency") or "₽",
+        "risks": data.get("risks") or data.get("notes") or "",
+        "variants": [],
     }
     for v in (data.get("variants") or data.get("options") or [])[:3]:
         works = []
         for w in (v.get("works") or []):
             works.append({
-                "name":       w.get("name") or "",
-                "unit":       w.get("unit") or "",
-                "qty":        _norm_int(w.get("qty") or 0),
+                "name": w.get("name") or "",
+                "unit": w.get("unit") or "",
+                "qty": _norm_int(w.get("qty") or 0),
                 "unit_price": _norm_int(w.get("unit_price") or 0),
-                "total":      _norm_int(w.get("total") or 0),
+                "total": _norm_int(w.get("total") or 0),
             })
         materials = []
         for m in (v.get("materials") or []):
             materials.append({
-                "name":       m.get("name") or "",
-                "brand":      m.get("brand") or "",
-                "unit":       m.get("unit") or "",
-                "qty":        _norm_int(m.get("qty") or 0),
+                "name": m.get("name") or "",
+                "brand": m.get("brand") or "",
+                "unit": m.get("unit") or "",
+                "qty": _norm_int(m.get("qty") or 0),
                 "unit_price": _norm_int(m.get("unit_price") or 0),
-                "total":      _norm_int(m.get("total") or 0),
+                "total": _norm_int(m.get("total") or 0),
             })
-        total_works     = _norm_int(v.get("total_works") or sum(w["total"] for w in works))
+        total_works = _norm_int(v.get("total_works") or sum(w["total"] for w in works))
         total_materials = _norm_int(v.get("total_materials") or sum(m["total"] for m in materials))
-        total           = _norm_int(v.get("total") or total_works + total_materials)
+        total = _norm_int(v.get("total") or total_works + total_materials)
         out["variants"].append({
-            "name":             v.get("name") or "",
-            "style":            v.get("style") or "",
-            "total_works":      total_works,
-            "total_materials":  total_materials,
-            "total":            total,
-            "budget":           v.get("budget") or f"{total:,} ₽".replace(",", " "),
-            "works":            works,
-            "materials":        materials,
-            "pros":             v.get("pros") or "",
-            "cons":             v.get("cons") or "",
+            "name": v.get("name") or "",
+            "style": v.get("style") or "",
+            "total_works": total_works,
+            "total_materials": total_materials,
+            "total": total,
+            "budget": v.get("budget") or f"{total:,} ₽".replace(",", " "),
+            "works": works,
+            "materials": materials,
+            "pros": v.get("pros") or "",
+            "cons": v.get("cons") or "",
         })
     return out
 
@@ -340,10 +332,7 @@ def _parse_retry_after(exc: RateLimitError) -> float:
         return 15.0
 
 
-async def _try_model(
-    client: AsyncOpenAI, model: str, messages: list,
-    max_tokens: int, use_json_mode: bool
-) -> dict:
+async def _try_model(client: AsyncOpenAI, model: str, messages: list, max_tokens: int, use_json_mode: bool) -> dict:
     kwargs: dict = dict(model=model, messages=messages, temperature=0.3, max_tokens=max_tokens)
     if use_json_mode:
         kwargs["response_format"] = {"type": "json_object"}
@@ -353,26 +342,27 @@ async def _try_model(
     return _normalize_result(parsed)
 
 
-async def get_estimate(situation: str, project: dict | None = None) -> dict:
+async def get_estimate(situation: str, project: dict | None = None, user_id: int | None = None) -> dict:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     model_chain = await _get_model_chain(api_key)
     if not model_chain:
         raise RuntimeError("Нет доступных моделей")
 
-    materials_context = await get_materials_context(situation, limit=3)
-    user_msg = _build_user_message(situation, project, materials_context)
+    materials_context = await get_materials_context(situation, limit=5)
+    user_rates = get_user_rates(user_id) if user_id else []
+    rates_context = _build_rates_context(user_rates)
+    user_msg = _build_user_message(situation, project, materials_context, rates_context)
 
     for model, base_url in model_chain:
         local = _is_local(base_url)
-        groq  = _is_groq(base_url)
+        groq = _is_groq(base_url)
         system_prompt = SYSTEM_PROMPT_LOCAL if local else SYSTEM_PROMPT
-        # Больше токенов — подробная смета длиннее
-        max_tokens = 1200 if local else 3000
+        max_tokens = 1400 if local else 3200
         use_json_mode = local or groq
         client = _make_client(base_url, api_key)
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_msg},
+            {"role": "user", "content": user_msg},
         ]
         json_attempts = 0
         provider_tag = "local" if local else ("groq" if groq else "openrouter")
