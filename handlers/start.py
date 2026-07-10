@@ -16,7 +16,7 @@ def _menu_text(user: dict) -> str:
     paid = is_paid_active(user)
     plan_icon = "💳" if paid else "🆓"
     return (
-        "👷 <b>Прораб-Бот</b>\n"
+        "🤖 <b>Prorab AI</b>\n"
         "────────────────────\n"
         f"{plan_icon} План: <b>{plan}</b>\n"
         f"📁 Проектов/месяц: <b>{limits['projects_per_month_label']}</b>\n"
@@ -82,7 +82,7 @@ async def cb_nav_subscribe(call: CallbackQuery) -> None:
     await call.message.answer(
         f"💳 <b>Подписка</b>\n\n"
         f"{plan_icon} План: <b>{plan}</b>\n"
-        f"Статус: <b>{'\u0430\u043a\u0442\u0438\u0432\u043d\u0430' if active else 'free'}</b>\n"
+        f"Статус: <b>{'активна' if active else 'free'}</b>\n"
         f"Оплачено до: <b>{user.get('paid_until') or '—'}</b>\n\n"
         "🆓 <b>Free</b> — 1 проект/мес, бюджетный вариант целиком\n"
         "💳 <b>Paid</b> — безлимит проектов, все 3 варианта целиком, PDF",
