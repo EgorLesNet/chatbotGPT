@@ -4,7 +4,7 @@ import logging
 import asyncio
 import re
 import httpx
-from openai import AsyncOpenAI, APITimeoutError, APIConnectionError, NotFoundError, RateLimitError
+from openai import AsyncOpenAI, APITimeoutError, APIConnectionError, NotFoundError, RateLimitError, APIStatusError
 from utils.materials_db import get_materials_context
 from utils.storage import get_user_rates
 
@@ -23,7 +23,7 @@ SYSTEM_PROMPT = """
 - Стоимость работ считай по расценкам мастера, если они переданы.
 - Если нужной расценки нет, используй реалистичную рыночную оценку.
 - Материалы подбирай адекватно задаче; не ограничивайся 1–2 позициями, если задача комплексная.
-- Если запрос общий и примерный, допустима укрупнённая смета: не нужно выдумывать сотни позиций, но состав работ должен соответствовать масштабу.
+- Если запрос общий и примерный, допустима укрупнённая смета.
 - Эконом, Оптимальный и Премиум должны различаться не только материалами, но и качеством/объёмом решений.
 - total_works = сумма works.total
 - total_materials = сумма materials.total
@@ -80,6 +80,20 @@ SYSTEM_PROMPT = """
   "risks": ""
 }
 """.strip()
+
+# Сжатый промпт для Groq (лимит ~6000 TPM на запрос + ответ)
+SYSTEM_PROMPT_GROQ = (
+    "Ты — прораб-сметчик в России. Составь смету ремонта в 3 вариантах (Эконом/Оптимальный/Премиум). "
+    "Для полного ремонта квартиры включай демонтаж, стены, полы, потолки, электрику, сантехнику, чистовую отделку. "
+    "Никогда не ставь cost_min/cost_max в 0 если варианты посчитаны. "
+    "Используй расценки мастера, если переданы. "
+    "Отвечай ONLY чистым JSON без комментариев:"
+    '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
+    '{"name":"Эконом","style":"Бюджетный","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
+    '{"name":"Оптимальный","style":"Средний","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
+    '{"name":"Премиум","style":"Дизайнерский","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""}'
+    '],"risks":""}'
+)
 
 SYSTEM_PROMPT_LOCAL = (
     "Отвечай ONLY чистым JSON. Смета ремонта в РФ в 3 вариантах. "
@@ -480,13 +494,26 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
         raise RuntimeError("Нет доступных моделей")
 
     scope_info = _detect_scope(situation)
-    materials_context = await get_materials_context(situation, limit=12)
+
+    # Полный user_msg для OpenRouter/локальных моделей (12 материалов)
+    materials_context_full = await get_materials_context(situation, limit=12)
+    # Сжатый user_msg для Groq (3 материала, чтобы не превысить лимит TPM)
+    materials_context_groq = await get_materials_context(situation, limit=3)
+
     user_rates = get_user_rates(user_id) if user_id else []
     rates_context = _build_rates_context(user_rates)
-    user_msg = _build_user_message(
+
+    user_msg_full = _build_user_message(
         situation=situation,
         project=project,
-        materials_context=materials_context,
+        materials_context=materials_context_full,
+        rates_context=rates_context,
+        scope_info=scope_info,
+    )
+    user_msg_groq = _build_user_message(
+        situation=situation,
+        project=project,
+        materials_context=materials_context_groq,
         rates_context=rates_context,
         scope_info=scope_info,
     )
@@ -494,9 +521,19 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
     for model, base_url in model_chain:
         local = _is_local(base_url)
         groq = _is_groq(base_url)
-        system_prompt = SYSTEM_PROMPT_LOCAL if local else SYSTEM_PROMPT
-        max_tokens = 2200 if local else 5200
+
+        if local:
+            system_prompt = SYSTEM_PROMPT_LOCAL
+            max_tokens = 2200
+        elif groq:
+            system_prompt = SYSTEM_PROMPT_GROQ
+            max_tokens = 1800
+        else:
+            system_prompt = SYSTEM_PROMPT
+            max_tokens = 5200
+
         use_json_mode = local or groq
+        user_msg = user_msg_groq if groq else user_msg_full
         client = _make_client(base_url, api_key)
         messages = [
             {"role": "system", "content": system_prompt},
@@ -529,6 +566,11 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
                 else:
                     logger.warning("Rate limit too long (%.0fs) on %s, skipping", wait, model)
                     break
+            except APIStatusError as exc:
+                if exc.status_code == 413:
+                    logger.warning("Payload too large (413) for %s (%s), skipping", model, provider_tag)
+                    break
+                raise
             except (APITimeoutError, APIConnectionError):
                 if attempt < len(RETRY_DELAYS):
                     logger.warning("Timeout on %s, retrying in %ds", model, delay)
