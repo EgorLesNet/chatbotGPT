@@ -153,18 +153,65 @@ def _build_user_message(situation: str, project: dict | None, materials_context:
 
 
 def _clean_json(raw: str) -> str:
-    raw = raw.strip()
+    # 1. Убрать <think>...</think> блоки (Qwen/DeepSeek reasoning)
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]
-    brace = raw.find("{")
-    if brace > 0:
-        raw = raw[brace:]
-    # Убери всё после последней }
-    last = raw.rfind("}")
-    if last != -1:
-        raw = raw[:last + 1]
-    return raw.strip()
+    raw = raw.strip()
+
+    # 2. Вырезать fenced-блоки ```json ... ``` или ``` ... ```
+    raw = re.sub(r"```(?:json)?\s*", "", raw)
+    raw = raw.replace("```", "")
+    raw = raw.strip()
+
+    # 3. Найти первый '{' и извлечь первый сбалансированный JSON-объект
+    start = raw.find("{")
+    if start == -1:
+        return raw
+    depth = 0
+    in_str = False
+    escape = False
+    for i, ch in enumerate(raw[start:], start):
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_str:
+            escape = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start: i + 1]
+    # Если скобки не закрыты — возвращаем от start до конца
+    return raw[start:]
+
+
+def _normalize_result(data: dict) -> dict:
+    """Привести результат к ожидаемой схеме summary/cost_min/cost_max/currency/variants/risks."""
+    out = {
+        "summary":  data.get("summary") or data.get("description") or "",
+        "cost_min": int(data.get("cost_min") or data.get("min_cost") or 0),
+        "cost_max": int(data.get("cost_max") or data.get("max_cost") or 0),
+        "currency": data.get("currency") or "₽",
+        "risks":    data.get("risks") or data.get("notes") or "",
+        "variants": [],
+    }
+    raw_variants = data.get("variants") or data.get("options") or []
+    for v in raw_variants[:3]:
+        out["variants"].append({
+            "name":      v.get("name") or "",
+            "budget":    v.get("budget") or v.get("price") or "",
+            "style":     v.get("style") or "",
+            "materials": v.get("materials") or [],
+            "pros":      v.get("pros") or "",
+            "cons":      v.get("cons") or "",
+        })
+    return out
 
 
 def _parse_retry_after(exc: RateLimitError) -> float:
@@ -183,7 +230,8 @@ async def _try_model(
         kwargs["response_format"] = {"type": "json_object"}
     response = await client.chat.completions.create(**kwargs)
     raw = response.choices[0].message.content
-    return json.loads(_clean_json(raw))
+    parsed = json.loads(_clean_json(raw))
+    return _normalize_result(parsed)
 
 
 async def get_estimate(situation: str, project: dict | None = None) -> dict:
@@ -241,8 +289,7 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 json_attempts += 1
                 if json_attempts < JSON_MAX_RETRIES:
                     logger.warning("Bad JSON from %s (attempt %d), retrying", model, json_attempts)
-                    # При повторе отключаем json_mode — может помочь
-                    use_json_mode = False
+                    # Не отключаем use_json_mode для локальной модели — режим должен сохраняться
                     await asyncio.sleep(2)
                 else:
                     logger.warning("Bad JSON from %s, skipping", model)
