@@ -45,7 +45,16 @@ SYSTEM_PROMPT_LOCAL = (
 )
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 LLAMACPP_DEFAULT_URL = "http://localhost:11434"
+
+# Модели Groq — быстрые, бесплатные на бесплатном тарифе
+# Можно задать через GROQ_MODEL в .env
+GROQ_DEFAULT_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "gemma2-9b-it",
+]
 
 HTTPX_TIMEOUT_LOCAL = httpx.Timeout(connect=5.0, read=600.0, write=15.0, pool=5.0)
 HTTPX_TIMEOUT_CLOUD = httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=5.0)
@@ -69,6 +78,10 @@ def _is_local(base_url: str) -> bool:
     return "localhost" in base_url or "127.0.0.1" in base_url
 
 
+def _is_groq(base_url: str) -> bool:
+    return "groq.com" in base_url
+
+
 async def _check_llamacpp() -> tuple[str, str] | None:
     base_url = os.getenv("LLAMACPP_URL", LLAMACPP_DEFAULT_URL).rstrip("/")
     model_name = os.getenv("LLAMACPP_MODEL", "local-model")
@@ -82,6 +95,15 @@ async def _check_llamacpp() -> tuple[str, str] | None:
         pass
     logger.info("llama.cpp not available at %s", base_url)
     return None
+
+
+def _get_groq_models() -> list[tuple[str, str]]:
+    """Вернуть список (model, GROQ_BASE_URL) если GROQ_API_KEY задан."""
+    if not os.getenv("GROQ_API_KEY", "").strip():
+        return []
+    custom = os.getenv("GROQ_MODEL", "").strip()
+    models = [custom] if custom else GROQ_DEFAULT_MODELS
+    return [(m, GROQ_BASE_URL) for m in models]
 
 
 async def fetch_free_models(api_key: str) -> list[str]:
@@ -113,12 +135,19 @@ async def fetch_free_models(api_key: str) -> list[str]:
 
 def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
     local = _is_local(base_url)
+    groq = _is_groq(base_url)
+    if local:
+        effective_key = "local"
+    elif groq:
+        effective_key = os.getenv("GROQ_API_KEY", "")
+    else:
+        effective_key = api_key
     return AsyncOpenAI(
-        api_key="local" if local else api_key,
+        api_key=effective_key,
         base_url=base_url,
         timeout=HTTPX_TIMEOUT_LOCAL if local else HTTPX_TIMEOUT_CLOUD,
         max_retries=0,
-        default_headers={} if local else {
+        default_headers={} if (local or groq) else {
             "HTTP-Referer": os.getenv("APP_URL", "https://github.com/EgorLesNet/chatbotGPT"),
             "X-Title": "ProrabBot",
         },
@@ -127,15 +156,26 @@ def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
 
 async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
     chain: list[tuple[str, str]] = []
+
+    # 1. Локальная llama.cpp (если запущена)
     local = await _check_llamacpp()
     if local:
         chain.append(local)
+
+    # 2. Groq — первый облак, самый быстрый
+    for groq_entry in _get_groq_models():
+        chain.append(groq_entry)
+
+    # 3. Приоритетная модель OpenRouter (если задана)
     primary = os.getenv("OPENROUTER_MODEL", "").strip()
     if primary:
         chain.append((primary, OPENROUTER_BASE_URL))
+
+    # 4. Бесплатные модели OpenRouter
     for m in await fetch_free_models(api_key):
         if not any(m == c[0] for c in chain):
             chain.append((m, OPENROUTER_BASE_URL))
+
     if not chain:
         logger.error("No models available")
     return chain
@@ -187,7 +227,6 @@ def _clean_json(raw: str) -> str:
             depth -= 1
             if depth == 0:
                 return raw[start: i + 1]
-    # Если скобки не закрыты — возвращаем от start до конца
     return raw[start:]
 
 
@@ -246,21 +285,23 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
 
     for model, base_url in model_chain:
         local = _is_local(base_url)
+        groq = _is_groq(base_url)
         system_prompt = SYSTEM_PROMPT_LOCAL if local else SYSTEM_PROMPT
         max_tokens = 800 if local else 1800
-        # response_format=json_object работает в llama.cpp >= b2963
-        use_json_mode = local
+        # json_object: работает в llama.cpp >= b2963 и Groq
+        use_json_mode = local or groq
         client = _make_client(base_url, api_key)
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg},
         ]
         json_attempts = 0
+        provider_tag = "local" if local else ("groq" if groq else "openrouter")
 
         for attempt, delay in enumerate(RETRY_DELAYS, start=1):
             try:
                 result = await _try_model(client, model, messages, max_tokens, use_json_mode)
-                logger.info("Estimate OK via %s (%s)", model, "local" if local else "cloud")
+                logger.info("Estimate OK via %s (%s)", model, provider_tag)
                 return result
 
             except NotFoundError:
@@ -289,7 +330,6 @@ async def get_estimate(situation: str, project: dict | None = None) -> dict:
                 json_attempts += 1
                 if json_attempts < JSON_MAX_RETRIES:
                     logger.warning("Bad JSON from %s (attempt %d), retrying", model, json_attempts)
-                    # Не отключаем use_json_mode для локальной модели — режим должен сохраняться
                     await asyncio.sleep(2)
                 else:
                     logger.warning("Bad JSON from %s, skipping", model)
