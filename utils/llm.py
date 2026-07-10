@@ -157,21 +157,21 @@ def _make_client(base_url: str, api_key: str) -> AsyncOpenAI:
 async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
     chain: list[tuple[str, str]] = []
 
-    # 1. Локальная llama.cpp (если запущена)
+    # 1. Groq — первый, самый быстрый облачный провайдер
+    for groq_entry in _get_groq_models():
+        chain.append(groq_entry)
+
+    # 2. Локальная llama.cpp (если запущена) — второй вариант
     local = await _check_llamacpp()
     if local:
         chain.append(local)
-
-    # 2. Groq — первый облак, самый быстрый
-    for groq_entry in _get_groq_models():
-        chain.append(groq_entry)
 
     # 3. Приоритетная модель OpenRouter (если задана)
     primary = os.getenv("OPENROUTER_MODEL", "").strip()
     if primary:
         chain.append((primary, OPENROUTER_BASE_URL))
 
-    # 4. Бесплатные модели OpenRouter
+    # 4. Бесплатные модели OpenRouter — последний fallback
     for m in await fetch_free_models(api_key):
         if not any(m == c[0] for c in chain):
             chain.append((m, OPENROUTER_BASE_URL))
