@@ -104,6 +104,7 @@ def create_project(user_id: int, title: str, project_type: str, area_m2: int, no
         "area_m2": area_m2,
         "notes": notes,
         "created_at": _now_iso(),
+        "estimates": [],
     }
     user.setdefault("projects", []).append(project)
     user.setdefault("usage", {}).setdefault("projects_created", 0)
@@ -115,6 +116,45 @@ def create_project(user_id: int, title: str, project_type: str, area_m2: int, no
 def get_user_projects(user_id: int) -> list[dict]:
     user = get_user(user_id)
     return user.get("projects", [])
+
+
+def get_project_by_id(user_id: int, project_id: str) -> dict | None:
+    """Вернуть проект по ID или None."""
+    user = get_user(user_id)
+    return next((p for p in user.get("projects", []) if p["id"] == project_id), None)
+
+
+def update_estimate_in_project(
+    user_id: int,
+    project_id: str,
+    estimate_idx: int,
+    patch: dict,
+) -> bool:
+    """Обновить поля сметы по индексу внутри проекта. Возвращает True при успехе."""
+    user = get_user(user_id)
+    project = next((p for p in user.get("projects", []) if p["id"] == project_id), None)
+    if not project:
+        return False
+    estimates = project.setdefault("estimates", [])
+    if estimate_idx < 0 or estimate_idx >= len(estimates):
+        return False
+    estimates[estimate_idx].update(patch)
+    save_user(user)
+    return True
+
+
+def delete_estimate_from_project(user_id: int, project_id: str, estimate_idx: int) -> bool:
+    """Удалить смету по индексу из проекта. Возвращает True при успехе."""
+    user = get_user(user_id)
+    project = next((p for p in user.get("projects", []) if p["id"] == project_id), None)
+    if not project:
+        return False
+    estimates = project.get("estimates", [])
+    if estimate_idx < 0 or estimate_idx >= len(estimates):
+        return False
+    estimates.pop(estimate_idx)
+    save_user(user)
+    return True
 
 
 def get_user_summary(user_id: int) -> dict:
