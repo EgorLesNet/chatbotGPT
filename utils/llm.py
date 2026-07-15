@@ -176,7 +176,7 @@ SYSTEM_PROMPT_LOCAL = (
     '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
     '{"name":"Эконом","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
     '{"name":"Оптимальный","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
-    '{"name":"Премиум","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""}'
+    '{"name":"Премиум","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
     '],"risks":""}'
 )
 
@@ -995,7 +995,12 @@ async def _try_model(
     return _normalize_result(parsed, project=project)
 
 
-async def get_estimate(situation: str, project: dict | None = None, user_id: int | None = None) -> dict:
+async def get_estimate(
+    situation: str,
+    project: dict | None = None,
+    user_id: int | None = None,
+    system_hint: str = "",
+) -> dict:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     model_chain = await _get_model_chain(api_key)
     if not model_chain:
@@ -1023,6 +1028,10 @@ async def get_estimate(situation: str, project: dict | None = None, user_id: int
         else:
             system_prompt = SYSTEM_PROMPT
             max_tokens = 5200
+
+        # Prepend system_hint if provided
+        if system_hint:
+            system_prompt = system_hint + "\n\n" + system_prompt
 
         use_json_mode = local or groq
         user_msg = user_msg_groq if groq else user_msg_full
