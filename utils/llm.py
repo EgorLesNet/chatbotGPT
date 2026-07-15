@@ -13,35 +13,82 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Правила цен для импортных материалов по стране происхождения + категории
-# (min_price, unit) — нижняя граница; если в смете ниже — поднимаем до min
 # ---------------------------------------------------------------------------
 _IMPORT_PRICE_RULES: list[dict] = [
-    # Напольные покрытия
     {"countries": ["польш", "poland", "польск"], "keywords": ["кварцвинил", "vinyl", "lvt", "ламинат", "laminate"], "min_price": 3500, "unit": "м²"},
     {"countries": ["герман", "germany", "deutsch"], "keywords": ["кварцвинил", "vinyl", "lvt", "ламинат", "laminate", "паркет", "parquet"], "min_price": 4000, "unit": "м²"},
     {"countries": ["бельги", "belgium"], "keywords": ["ламинат", "laminate", "паркет"], "min_price": 3800, "unit": "м²"},
-    # Плитка
     {"countries": ["итали", "italy", "italian"], "keywords": ["плитк", "tile", "керам", "porcel"], "min_price": 2500, "unit": "м²"},
     {"countries": ["испани", "spain", "spanish"], "keywords": ["плитк", "tile", "керам"], "min_price": 2000, "unit": "м²"},
-    # Краски
     {"countries": ["финлянд", "finland", "финск"], "keywords": ["краск", "paint", "эмаль"], "min_price": 800, "unit": "л"},
     {"countries": ["герман", "germany", "deutsch"], "keywords": ["краск", "paint", "эмаль"], "min_price": 900, "unit": "л"},
 ]
 
-# Нормальная пропорция работы/материалы для ремонта: работы не менее 25% от общей суммы
 _MIN_WORKS_RATIO = 0.25
-# Минимальный процентный разрыв между вариантами (25% от предыдущего)
 _MIN_TIER_GAP_PCT = 0.25
-# Потолок цены напольного покрытия для Эконома (₽/м²)
 _ECONOM_FLOOR_MAX_PRICE = 1900
-# Ключевые слова напольных покрытий
 _FLOOR_COVERING_KEYWORDS = ["кварцвинил", "ламинат", "линолеум", "vinyl", "laminate", "lvt", "покрытие пол", "напольн"]
-# Фразы самокритики, которые нельзя оставлять в выводе
 _SELF_DOUBT_PHRASES = [
     "требует уточнения", "неуверен в цифрах", "приблизительно", "возможно неточно",
     "данные могут отличаться", "рекомендуется уточнить", "уточните у специалиста",
     "не могу гарантировать точность", "ориентировочные данные",
 ]
+
+_CONTRACTOR_MARGIN_NOTE = (
+    "Расчёт отражает стоимость материалов и прямых работ без учёта маржи подрядной организации "
+    "(обычно +15–30%). Цены строительных компаний «под ключ» включают накладные расходы и прибыль."
+)
+
+# ---------------------------------------------------------------------------
+# Сантехприборы по вариантам (эконом / оптимальный / премиум)
+# ---------------------------------------------------------------------------
+_PLUMBING_FIXTURES: dict[str, list[dict]] = {
+    "эконом": [
+        {"name": "Унитаз напольный", "brand": "Эконом-класс", "unit": "шт", "qty": 1, "unit_price": 5500, "total": 5500},
+        {"name": "Раковина для ванной", "brand": "Эконом-класс", "unit": "шт", "qty": 1, "unit_price": 2500, "total": 2500},
+        {"name": "Смеситель для ванной/душа", "brand": "Эконом-класс", "unit": "шт", "qty": 1, "unit_price": 2000, "total": 2000},
+        {"name": "Смеситель для кухни", "brand": "Эконом-класс", "unit": "шт", "qty": 1, "unit_price": 1500, "total": 1500},
+        {"name": "Ванна акриловая или душевой поддон", "brand": "Эконом-класс", "unit": "шт", "qty": 1, "unit_price": 8000, "total": 8000},
+    ],
+    "оптимальный": [
+        {"name": "Унитаз напольный", "brand": "Средний класс", "unit": "шт", "qty": 1, "unit_price": 9000, "total": 9000},
+        {"name": "Раковина для ванной", "brand": "Средний класс", "unit": "шт", "qty": 1, "unit_price": 4500, "total": 4500},
+        {"name": "Смеситель для ванной/душа", "brand": "Средний класс", "unit": "шт", "qty": 1, "unit_price": 4500, "total": 4500},
+        {"name": "Смеситель для кухни", "brand": "Средний класс", "unit": "шт", "qty": 1, "unit_price": 3000, "total": 3000},
+        {"name": "Ванна акриловая или душевая кабина", "brand": "Средний класс", "unit": "шт", "qty": 1, "unit_price": 18000, "total": 18000},
+    ],
+    "премиум": [
+        {"name": "Унитаз подвесной", "brand": "Премиум-класс", "unit": "шт", "qty": 1, "unit_price": 22000, "total": 22000},
+        {"name": "Раковина встроенная", "brand": "Премиум-класс", "unit": "шт", "qty": 1, "unit_price": 12000, "total": 12000},
+        {"name": "Смеситель для ванной/душа", "brand": "Премиум-класс", "unit": "шт", "qty": 1, "unit_price": 12000, "total": 12000},
+        {"name": "Смеситель для кухни", "brand": "Премиум-класс", "unit": "шт", "qty": 1, "unit_price": 7000, "total": 7000},
+        {"name": "Душевая кабина или ванна отдельностоящая", "brand": "Премиум-класс", "unit": "шт", "qty": 1, "unit_price": 55000, "total": 55000},
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# Детализация электрощита по вариантам
+# ---------------------------------------------------------------------------
+_ELECTRICAL_PANEL_ITEMS: dict[str, list[dict]] = {
+    "эконом": [
+        {"name": "Щит распределительный (бокс)", "brand": "На 24 модуля", "unit": "шт", "qty": 1, "unit_price": 1500, "total": 1500},
+        {"name": "Вводной автомат 40А", "brand": "IEK / EKF", "unit": "шт", "qty": 1, "unit_price": 800, "total": 800},
+        {"name": "Автоматы групповые 16А", "brand": "IEK / EKF (6–8 шт)", "unit": "шт", "qty": 7, "unit_price": 350, "total": 2450},
+        {"name": "УЗО 25А/30мА", "brand": "IEK / EKF", "unit": "шт", "qty": 2, "unit_price": 1200, "total": 2400},
+    ],
+    "оптимальный": [
+        {"name": "Щит распределительный (бокс)", "brand": "Legrand / ABB на 32 модуля", "unit": "шт", "qty": 1, "unit_price": 3500, "total": 3500},
+        {"name": "Вводной автомат 50А", "brand": "Legrand / ABB", "unit": "шт", "qty": 1, "unit_price": 1800, "total": 1800},
+        {"name": "Автоматы групповые 16–25А", "brand": "Legrand / ABB (8 шт)", "unit": "шт", "qty": 8, "unit_price": 650, "total": 5200},
+        {"name": "УЗО 25А/30мА", "brand": "Legrand / ABB", "unit": "шт", "qty": 2, "unit_price": 2500, "total": 5000},
+    ],
+    "премиум": [
+        {"name": "Щит распределительный (бокс)", "brand": "Schneider / Hager на 48 мод.", "unit": "шт", "qty": 1, "unit_price": 8000, "total": 8000},
+        {"name": "Вводной автомат 63А", "brand": "Schneider Electric", "unit": "шт", "qty": 1, "unit_price": 3500, "total": 3500},
+        {"name": "Автоматы групповые 16–32А", "brand": "Schneider Electric (10 шт)", "unit": "шт", "qty": 10, "unit_price": 1200, "total": 12000},
+        {"name": "УЗО/дифавтоматы 25А/30мА", "brand": "Schneider Electric", "unit": "шт", "qty": 3, "unit_price": 4500, "total": 13500},
+    ],
+}
 
 
 SYSTEM_PROMPT = """
@@ -59,44 +106,49 @@ SYSTEM_PROMPT = """
 
 ПРАВИЛА АРИФМЕТИКИ (КРИТИЧНО):
 - Каждая строка: qty × unit_price = total. После расчёта проверь умножением ещё раз. Если total ≠ qty × unit_price — пересчитай и исправь перед выводом.
-- После формирования сметы пересчитай total_works = сумма всех works[].total, total_materials = сумма всех materials[].total, total = total_works + total_materials. Если не совпадает с указанным Итого — найди и исправь ошибочную строку.
+- После формирования сметы пересчитай total_works = сумма всех works[].total, total_materials = сумма всех materials[].total, total = total_works + total_materials.
 - Никогда не выводи строку с заведомо неверным итогом.
-- Перед выводом сметы удаляй любые позиции материалов и работ, где количество или цена равны 0 — такие строки не несут информации и выглядят как баг.
+- Перед выводом удаляй любые позиции, где qty=0 или unit_price=0 — такие строки выглядят как баг.
 
 ПРАВИЛА РАСЧЁТА МАТЕРИАЛОВ:
-- quantity = ceiling((площадь × норма расхода) / вес_или_объём_упаковки). Никогда не ставь произвольно.
+- quantity = ceiling((площадь × норма расхода) / вес_упаковки). Никогда не ставь произвольно.
 - Для каждого сыпучего/жидкого материала указывай норму расхода в названии или бренде: "Расход 8.5 кг/м²".
-- Если материал — импортный (Польша, Германия, Италия, Бельгия, Финляндия и т.д.), цена не может быть ниже среднерыночной для этой категории. Польский/немецкий кварцвинил и ламинат — от 3 500 ₽/м². Итальянская плитка — от 2 500 ₽/м². Если цена не соответствует стране — используй отечественный аналог или скорректируй цену.
-- Для варианта «Эконом»: цена напольного покрытия (кварцвинил, ламинат, линолеум) не должна превышать 1 900 ₽/м². Если выбранный материал дороже — используй более бюджетный аналог или перемести его в «Оптимальный».
-- Каждая строка материала должна соответствовать строке работы с тем же названием покрытия или системы. Если работа называется "Укладка ламината", в материалах не должно быть строки "Кварцвинил". Используй единый словарь названий и удаляй неиспользуемые позиции при смене типа покрытия.
+- Импортный материал (Польша, Германия, Италия, Бельгия, Финляндия): цена не ниже рынка. Польский/немецкий кварцвинил и ламинат — от 3 500 ₽/м². Итальянская плитка — от 2 500 ₽/м².
+- Эконом: напольное покрытие не дороже 1 900 ₽/м².
+- Каждая строка материала должна совпадать по типу покрытия/системы с соответствующей строкой работы. Если работа — «Укладка ламината», в материалах не должно быть «Кварцвинил».
 
 ПРАВИЛА СИНХРОНИЗАЦИИ ПЛОЩАДЕЙ:
-- Если в смете несколько типов напольного покрытия (кварцвинил, плитка, ламинат), сумма их площадей (qty) должна точно равняться общей площади пола в проекте.
-- Для каждого типа напольного покрытия должна быть отдельная строка работы по укладке с той же площадью.
-- При замене напольного покрытия всегда включай строку "Установка плинтусов" — она не может отсутствовать в полной смете ремонта.
+- Несколько типов напольного покрытия: сумма площадей = общая площадь пола.
+- Для каждого типа — отдельная строка укладки.
+- При замене пола всегда включай строку «Установка плинтусов».
 
-ПРАВИЛА РАЗДЕЛОВ:
-- Раздел "Электромонтаж" обязательно должен включать минимум 4 строки: штробление/прокладка кабеля (работа), сам кабель (материал), автоматы/УЗО в щитке (материал), сборка и монтаж щитка (работа). Одна строка "бокс щита" недопустима.
-- Смета "Полный ремонт квартиры" должна ВСЕГДА содержать раздел "Сантехнические работы" минимум с 2 строками: разводка труб (работа) и сантехприборы/фитинги (материал), рассчитанные по количеству точек (кухня + ванная + туалет ≈ 4–6 точек).
+ПРАВИЛА ЭЛЕКТРОМОНТАЖА:
+- Раздел «Электромонтаж» обязательно содержит минимум 4 строки работ: штробление/прокладка кабеля (работа), и минимум 4 строки материалов: кабель, вводной автомат, групповые автоматы (6–8 шт), УЗО (2 шт), бокс щитка — по отдельности, не единой строкой «комплект».
+- Одна строка «бокс щита за 600 ₽» недопустима.
+
+ПРАВИЛА САНТЕХНИКИ:
+- Смета «Полный ремонт» ВСЕГДА включает раздел сантехники с минимум 2 строками работ (разводка труб, установка приборов) и 6 строками материалов: трубы/фитинги, унитаз, раковина, смеситель для ванной, смеситель для кухни, ванна/душевая кабина.
+- Ванная комната: те же приборы обязательны.
+- Ориентиры цен эконом: унитаз ~5 500 ₽, смеситель ~1 500–2 000 ₽, раковина ~2 500 ₽, ванна/поддон ~8 000 ₽.
 
 ПРАВИЛА РАБОТ И СООТНОШЕНИЙ:
 - Штукатурка потолков — на 20–40% дороже штукатурки стен.
-- Перед штукатуркой обязательно добавляй грунтовку основания отдельной строкой работ и материалов.
-- Работы должны составлять не менее 30–40% от итоговой суммы варианта. Если материалы в 10+ раз превышают работы — это ошибка, пересчитай пропорцию.
-- Каждый вариант (Эконом / Оптимальный / Премиум) должен содержать полный набор этапов работ и материалов. Премиум не может иметь меньше этапов работ, чем Эконом.
+- Перед штукатуркой обязательно добавляй грунтовку основания.
+- Работы не менее 30–40% от итоговой суммы варианта.
+- Каждый вариант содержит полный набор этапов. Премиум не меньше этапов работ, чем Эконом.
 
 ПРАВИЛА ГРАДАЦИИ ЦЕН:
-- Итог Премиум должен быть на 25–50% больше Оптимального, Оптимальный — на 20–30% больше Эконома.
-- Если расчёт не выдаёт этот разрыв — увеличивай стоимость материалов/работ следующего уровня.
-- cost_min = минимальный total среди трёх вариантов; cost_max = максимальный. Никогда не ставь в 0.
+- Итог Премиум на 25–50% больше Оптимального, Оптимальный на 20–30% больше Эконома.
+- cost_min/cost_max = min/max total среди вариантов.
 
-ПРАВИЛА ОФОРМЛЕНИЯ ВЫВОДА:
-- Никогда не включай в финальный JSON фразы вида «требует уточнения», «неуверен в цифрах», «рекомендуется уточнить» и подобные. Если данных недостаточно — либо дополни расчёт разумными допущениями, либо полностью убери соответствующую секцию.
+ПРАВИЛА ВЫВОДА:
+- Никогда не включай фразы «требует уточнения», «неуверен в цифрах», «рекомендуется уточнить».
+- В поле "risks" всегда добавляй примечание: "Расчёт отражает стоимость материалов и прямых работ без учёта маржи подрядной организации (обычно +15–30%). Цены компаний «под ключ» включают накладные расходы и прибыль."
 
 ОСТАЛЬНЫЕ ПРАВИЛА:
-- total_works = сумма works.total; total_materials = сумма materials.total; total = total_works + total_materials.
-- Никогда не оставляй пустые pros/cons и не отдавай вариант с 0 материалов.
-- Диапазон cost_min/cost_max строго совпадает с min/max total среди вариантов.
+- total = total_works + total_materials.
+- Не оставляй пустые pros/cons, не отдавай вариант с 0 материалов.
+- Диапазон cost_min/cost_max = min/max total вариантов.
 
 Верни ONLY raw JSON:
 {
@@ -150,22 +202,24 @@ SYSTEM_PROMPT_GROQ = (
     "Ты — прораб-сметчик в России. Смета ремонта в 3 вариантах (Эконом/Оптимальный/Премиум). "
     "Полный ремонт: включай демонтаж, стены, полы, потолки, электрику, сантехнику, чистовую отделку. "
     "Используй расценки мастера, если переданы. "
-    "АРИФМЕТИКА: каждая строка qty×unit_price=total — проверь умножением. После смет пересчитай total_works и total как суммы строк. Если не совпадает — исправь. "
-    "Перед выводом удаляй строки с qty=0 или unit_price=0. "
-    "Материалы считай только математически по норме расхода, округляй вверх. "
-    "Для сыпучих/жидких — указывай норму расхода в названии/бренде. "
-    "Импортный материал (Польша, Германия и т.д.): цена не ниже рынка — польский/немецкий кварцвинил от 3500₽/м², итальянская плитка от 2500₽/м²; иначе замени на отечественный аналог. "
-    "Эконом: напольное покрытие не дороже 1900₽/м²; если дороже — замени на бюджетный аналог или перемести в Оптимальный. "
-    "Материалы и работы по напольному покрытию должны совпадать по названию; не оставляй кварцвинил, если работа — укладка ламината. "
-    "Несколько типов напольного покрытия: сумма их площадей = общая площадь пола; для каждого — отдельная строка укладки. "
-    "При замене напольного покрытия всегда включай установку плинтусов. "
-    "Электромонтаж минимум 4 строки: штробление/кабель, кабель, автоматы/УЗО, сборка и монтаж щитка. Одна строка про бокс щита недопустима. "
-    "Сантехника в полном ремонте обязательна: минимум разводка труб и сантехприборы/фитинги на 4-6 точек. "
+    "АРИФМЕТИКА: каждая строка qty×unit_price=total — проверь умножением. Пересчитай total_works и total как суммы строк. Исправь несовпадения. "
+    "Удаляй строки с qty=0 или unit_price=0. "
+    "Материалы считай математически по норме расхода, округляй вверх. "
+    "Для сыпучих/жидких — норму расхода указывай в названии/бренде. "
+    "Импортный материал: цена не ниже рынка — польский/немецкий кварцвинил от 3500₽/м², итальянская плитка от 2500₽/м². "
+    "Эконом: напольное покрытие не дороже 1900₽/м². "
+    "Материалы и работы по покрытию пола — совпадать по типу (если укладка ламината, не оставляй кварцвинил). "
+    "Несколько типов пола: сумма площадей = площадь пола; для каждого — строка укладки. "
+    "При замене пола всегда включай установку плинтусов. "
+    "Электромонтаж — минимум 4 строки работ и 4 строки материалов: штробление, кабель, вводной автомат, групповые автоматы (6–8 шт), УЗО (2 шт), бокс щитка — раздельно. "
+    "Сантехника в полном ремонте обязательна: минимум разводка труб + установка приборов (работы); трубы/фитинги, унитаз, раковина, смеситель для ванной, смеситель для кухни, ванна/душевая кабина (материалы). "
+    "Ванная комната: те же приборы обязательны. "
     "Штукатурка потолков — на 20-40% дороже стен. Грунтовка перед штукатуркой — обязательно. "
     "Работы >= 30% от итога варианта. Каждый вариант — полный набор этапов, Премиум не менее этапов, чем Эконом. "
-    "Разрыв цен: Оптимальный на 20-30% больше Эконома, Премиум на 25-50% больше Оптимального. "
-    "Не включай фразы 'требует уточнения', 'неуверен в цифрах' и подобные — замени допущениями или убери секцию. "
-    "Никогда не ставь cost_min/cost_max в 0; диапазон = min/max total; не отдавай пустые варианты. "
+    "Разрыв: Оптимальный на 20-30% больше Эконома, Премиум на 25-50% больше Оптимального. "
+    "Не включай фразы 'требует уточнения', 'неуверен в цифрах' — замени допущениями или убери секцию. "
+    "В поле risks всегда добавляй: 'Расчёт без учёта маржи подрядчика (+15–30%). Цены компаний под ключ включают накладные расходы.' "
+    "Никогда не ставь cost_min/cost_max в 0; не отдавай пустые варианты. "
     "Отвечай ONLY чистым JSON:"
     '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
     '{"name":"Эконом","style":"Бюджетный","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
@@ -176,18 +230,16 @@ SYSTEM_PROMPT_GROQ = (
 
 SYSTEM_PROMPT_LOCAL = (
     "Отвечай ONLY чистым JSON. Смета ремонта в РФ в 3 вариантах. "
-    "АРИФМЕТИКА: qty×unit_price=total в каждой строке; total_works и total = суммы строк. Проверь перед выводом. "
-    "Удаляй строки с qty=0 или unit_price=0. "
-    "Используй расценки мастера, если переданы. "
-    "Материалы — только по норме расхода через арифметику. "
+    "АРИФМЕТИКА: qty×unit_price=total в каждой строке; total_works и total = суммы строк. Проверь перед выводом. Удаляй строки с qty=0 или unit_price=0. "
+    "Используй расценки мастера, если переданы. Материалы — только по норме расхода. "
     "Импортный материал: цена не ниже рынка. Эконом: напольное покрытие <= 1900₽/м². "
-    "Материалы и работы по покрытию пола должны совпадать по типу. "
-    "Несколько типов пола: сумма площадей = площадь пола; для каждого — строка укладки. "
-    "Всегда добавляй установку плинтусов при замене пола. "
-    "Для полного ремонта обязательны электрика (4+ строки) и сантехника (2+ строки). "
+    "Материалы и работы по полу совпадают по типу; при замене пола — плинтусы обязательны. "
+    "Для полного ремонта: электрика (4+ строки работ, 4+ материалов: кабель, вводной автомат, групповые автоматы, УЗО, бокс щитка — раздельно) и сантехника (2+ работ, 6+ материалов: трубы/фитинги + унитаз + раковина + смеситель ванной + смеситель кухни + ванна/душевая). "
+    "Ванная комната: те же приборы обязательны. "
     "Работы >= 30% итога. Полный набор этапов в каждом варианте. "
     "Разрыв: Оптимальный > Эконом на 20%+, Премиум > Оптимальный на 25%+. "
     "Без фраз 'требует уточнения' и подобных. "
+    "В поле risks: 'Расчёт без учёта маржи подрядчика (+15–30%).' "
     "cost_min/cost_max = min/max total. Не оставляй пустые варианты. "
     '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
     '{"name":"Эконом","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
@@ -513,11 +565,7 @@ def _fix_floor_name_sync(works: list[dict], materials: list[dict]) -> list[dict]
     return cleaned
 
 
-# ---------------------------------------------------------------------------
-# ПРАВКА 1 + 5: Пост-валидация арифметики строк и итоговой суммы
-# ---------------------------------------------------------------------------
 def _fix_line_arithmetic(rows: list[dict]) -> list[dict]:
-    """Для каждой строки: если total != qty*unit_price — пересчитываем total."""
     for row in rows:
         qty = _norm_int(row.get("qty") or 0)
         unit_price = _norm_int(row.get("unit_price") or 0)
@@ -532,17 +580,11 @@ def _fix_line_arithmetic(rows: list[dict]) -> list[dict]:
     return rows
 
 
-# ---------------------------------------------------------------------------
-# ПРАВКА 2: Синхронизация площади напольных покрытий
-# ---------------------------------------------------------------------------
 def _fix_floor_area_sync(
     works: list[dict],
     materials: list[dict],
     project_area: float | None,
 ) -> tuple[list[dict], list[dict]]:
-    """Проверяет, что сумма площадей напольных покрытий = площади пола.
-    Для каждого покрытия добавляет строку укладки, если её нет.
-    Если площадь проекта неизвестна — только добавляем укладку."""
     floor_mats = [
         m for m in materials
         if any(kw in (m.get("name") or "").lower() for kw in _FLOOR_COVERING_KEYWORDS)
@@ -555,10 +597,6 @@ def _fix_floor_area_sync(
         total_floor_qty = sum(_norm_int(m.get("qty")) for m in floor_mats)
         if total_floor_qty != _ceil_int(project_area):
             scale = project_area / max(total_floor_qty, 1)
-            logger.info(
-                "Floor area sync: total_qty=%d -> project_area=%.1f, scale=%.3f",
-                total_floor_qty, project_area, scale
-            )
             remaining = _ceil_int(project_area)
             for i, m in enumerate(floor_mats):
                 if i < len(floor_mats) - 1:
@@ -580,34 +618,25 @@ def _fix_floor_area_sync(
         )
         if not has_install_work and mat_qty > 0:
             if "плитк" in mat_name or "tile" in mat_name or "керам" in mat_name:
-                work_name = "Укладка плитки"
-                unit_price = 900
+                work_name, unit_price = "Укладка плитки", 900
             elif "кварцвинил" in mat_name or "vinyl" in mat_name or "lvt" in mat_name:
-                work_name = "Укладка кварцвинила"
-                unit_price = 400
+                work_name, unit_price = "Укладка кварцвинила", 400
             elif "ламинат" in mat_name or "laminate" in mat_name:
-                work_name = "Укладка ламината"
-                unit_price = 350
+                work_name, unit_price = "Укладка ламината", 350
             elif "паркет" in mat_name or "parquet" in mat_name:
-                work_name = "Укладка паркетной доски"
-                unit_price = 600
+                work_name, unit_price = "Укладка паркетной доски", 600
             else:
-                work_name = "Укладка напольного покрытия"
-                unit_price = 350
-            works.append({
-                "name": work_name,
-                "unit": "м²",
-                "qty": mat_qty,
-                "unit_price": unit_price,
-                "total": mat_qty * unit_price,
-            })
-            logger.info("Floor install work added: '%s' %d м²", work_name, mat_qty)
+                work_name, unit_price = "Укладка напольного покрытия", 350
+            works.append({"name": work_name, "unit": "м²", "qty": mat_qty, "unit_price": unit_price, "total": mat_qty * unit_price})
     return works, materials
 
 
 def _ensure_skirting_boards(works: list[dict], materials: list[dict], project_area: float | None) -> tuple[list[dict], list[dict]]:
     has_floor_work = any(any(kw in (w.get("name") or "").lower() for kw in _FLOOR_COVERING_KEYWORDS) for w in works)
-    has_skirting = any("плинтус" in (w.get("name") or "").lower() for w in works) or any("плинтус" in (m.get("name") or "").lower() for m in materials)
+    has_skirting = (
+        any("плинтус" in (w.get("name") or "").lower() for w in works)
+        or any("плинтус" in (m.get("name") or "").lower() for m in materials)
+    )
     if not has_floor_work or has_skirting:
         return works, materials
     length = max(20, _ceil_int((project_area or 40) * 0.9))
@@ -616,41 +645,106 @@ def _ensure_skirting_boards(works: list[dict], materials: list[dict], project_ar
     return works, materials
 
 
-def _ensure_electrical_section(works: list[dict], materials: list[dict], scope: str, project_area: float | None) -> tuple[list[dict], list[dict]]:
+def _get_tier_key(variant_name: str) -> str:
+    name = (variant_name or "").lower()
+    if "эконом" in name or "бюджет" in name:
+        return "эконом"
+    if "премиум" in name or "дизайн" in name or "люкс" in name:
+        return "премиум"
+    return "оптимальный"
+
+
+def _ensure_electrical_section(works: list[dict], materials: list[dict], scope: str, project_area: float | None, variant_name: str = "") -> tuple[list[dict], list[dict]]:
     if scope != "full_apartment":
         return works, materials
     elec_work_count = sum(1 for w in works if any(k in (w.get("name") or "").lower() for k in ["элект", "кабел", "штроб", "щит", "автомат", "узо"]))
-    elec_mat_count = sum(1 for m in materials if any(k in (m.get("name") or "").lower() for k in ["кабел", "щит", "автомат", "узо", "розет", "выключ"]))
+    elec_mat_count = sum(1 for m in materials if any(k in (m.get("name") or "").lower() for k in ["кабел", "щит", "автомат", "узо", "розет", "выключ", "вводной"]))
     cable_len = max(60, _ceil_int((project_area or 40) * 2.2))
+
     if elec_work_count < 2:
         works.append({"name": "Штробление и прокладка кабеля", "unit": "м", "qty": cable_len, "unit_price": 250, "total": cable_len * 250})
         works.append({"name": "Сборка и монтаж щитка", "unit": "шт", "qty": 1, "unit_price": 6500, "total": 6500})
-    if elec_mat_count < 2:
+
+    # Добавляем детализацию щитка (бокс, вводной, групповые, УЗО) если не хватает
+    has_main_breaker = any("вводной" in (m.get("name") or "").lower() for m in materials)
+    has_group_breakers = any("групповые" in (m.get("name") or "").lower() or "автомат" in (m.get("name") or "").lower() for m in materials)
+    has_rcd = any("узо" in (m.get("name") or "").lower() or "дифавтомат" in (m.get("name") or "").lower() for m in materials)
+    has_panel_box = any("щит" in (m.get("name") or "").lower() and "бокс" not in (m.get("name") or "").lower() or "бокс" in (m.get("name") or "").lower() for m in materials)
+
+    tier = _get_tier_key(variant_name)
+    panel_items = _ELECTRICAL_PANEL_ITEMS.get(tier, _ELECTRICAL_PANEL_ITEMS["оптимальный"])
+
+    if not has_panel_box:
+        materials.append(dict(panel_items[0]))  # бокс щитка
+    if not has_main_breaker:
+        materials.append(dict(panel_items[1]))  # вводной автомат
+    if not has_group_breakers:
+        materials.append(dict(panel_items[2]))  # групповые автоматы
+    if not has_rcd:
+        materials.append(dict(panel_items[3]))  # УЗО
+
+    # Кабель — если вообще нет
+    if elec_mat_count < 2 and not any("кабел" in (m.get("name") or "").lower() for m in materials):
         materials.append({"name": "Кабель ВВГнг-LS", "brand": "3x2.5 / 3x1.5", "unit": "м", "qty": cable_len, "unit_price": 95, "total": cable_len * 95})
-        materials.append({"name": "Автоматы и УЗО для щитка", "brand": "Комплект", "unit": "компл", "qty": 1, "unit_price": 8500, "total": 8500})
-        if not any("щит" in (m.get("name") or "").lower() for m in materials):
-            materials.append({"name": "Щит распределительный", "brand": "С автоматами", "unit": "шт", "qty": 1, "unit_price": 4500, "total": 4500})
+
     return works, materials
 
 
-def _ensure_plumbing_section(works: list[dict], materials: list[dict], scope: str) -> tuple[list[dict], list[dict]]:
-    if scope != "full_apartment":
+def _ensure_plumbing_section(works: list[dict], materials: list[dict], scope: str, variant_name: str = "") -> tuple[list[dict], list[dict]]:
+    if scope not in ("full_apartment", "bathroom"):
         return works, materials
-    has_plumbing_work = any(any(k in (w.get("name") or "").lower() for k in ["сантех", "труб", "вод", "канализ"]) for w in works)
-    has_plumbing_mat = any(any(k in (m.get("name") or "").lower() for k in ["сантех", "труб", "фитинг", "коллектор", "подключен"]) for m in materials)
+
+    has_plumbing_work = any(any(k in (w.get("name") or "").lower() for k in ["сантех", "труб", "вод", "канализ", "установк", "подключ"]) for w in works)
+    has_pipe_mat = any(any(k in (m.get("name") or "").lower() for k in ["труб", "фитинг", "коллектор"]) for m in materials)
+
+    # Проверяем наличие приборов
+    has_toilet = any("унитаз" in (m.get("name") or "").lower() for m in materials)
+    has_sink = any("раковин" in (m.get("name") or "").lower() for m in materials)
+    has_faucet_bath = any("смеситель" in (m.get("name") or "").lower() and ("ванн" in (m.get("name") or "").lower() or "душ" in (m.get("name") or "").lower()) for m in materials)
+    has_faucet_kitchen = any("смеситель" in (m.get("name") or "").lower() and "кухн" in (m.get("name") or "").lower() for m in materials)
+    has_bath_shower = any("ванн" in (m.get("name") or "").lower() or "душев" in (m.get("name") or "").lower() for m in materials)
+
+    tier = _get_tier_key(variant_name)
+    fixtures = _PLUMBING_FIXTURES.get(tier, _PLUMBING_FIXTURES["оптимальный"])
+
     points = 5
     if not has_plumbing_work:
         works.append({"name": "Разводка труб водоснабжения и канализации", "unit": "точка", "qty": points, "unit_price": 4500, "total": points * 4500})
-    if not has_plumbing_mat:
+    # Добавляем монтаж приборов если нет
+    has_install_work = any(any(k in (w.get("name") or "").lower() for k in ["установк", "подключ", "монтаж сантех"]) for w in works)
+    if not has_install_work:
+        works.append({"name": "Установка и подключение сантехприборов", "unit": "шт", "qty": points, "unit_price": 2000, "total": points * 2000})
+
+    if not has_pipe_mat:
         materials.append({"name": "Трубы и фитинги для сантехники", "brand": "На 4-6 точек", "unit": "компл", "qty": 1, "unit_price": 18000, "total": 18000})
+
+    # Добавляем отсутствующие приборы
+    if not has_toilet:
+        materials.append(dict(fixtures[0]))  # унитаз
+    if not has_sink:
+        materials.append(dict(fixtures[1]))  # раковина
+    if not has_faucet_bath:
+        materials.append(dict(fixtures[2]))  # смеситель ванной
+    if scope == "full_apartment" and not has_faucet_kitchen:
+        materials.append(dict(fixtures[3]))  # смеситель кухни
+    if not has_bath_shower:
+        materials.append(dict(fixtures[4]))  # ванна/душ
+
     return works, materials
 
 
-# ---------------------------------------------------------------------------
-# ПРАВКА 3: Удаление фраз самокритики из строковых полей
-# ---------------------------------------------------------------------------
+def _ensure_contractor_margin_note(out: dict) -> dict:
+    """Добавляет примечание о наценке подрядчика в поле risks, если его нет."""
+    risks = out.get("risks") or ""
+    if "маржи" not in risks.lower() and "накладн" not in risks.lower() and "+15" not in risks:
+        if risks:
+            out["risks"] = risks.rstrip() + " " + _CONTRACTOR_MARGIN_NOTE
+        else:
+            out["risks"] = _CONTRACTOR_MARGIN_NOTE
+    return out
+
+
 def _fix_self_doubt_phrases(variant: dict) -> dict:
-    """Удаляет/заменяет самокритичные фразы из pros, cons, summary, budget."""
     fields_to_clean = ["pros", "cons", "budget", "summary"]
     for field in fields_to_clean:
         val = variant.get(field) or ""
@@ -674,9 +768,6 @@ def _fix_self_doubt_phrases(variant: dict) -> dict:
     return variant
 
 
-# ---------------------------------------------------------------------------
-# ПРАВКА 4: Потолок цены напольного покрытия для Эконома
-# ---------------------------------------------------------------------------
 def _fix_econom_floor_cap(variant: dict) -> dict:
     if (variant.get("name") or "").lower() not in ("эконом", "econom", "economy", "бюджетный"):
         return variant
@@ -689,10 +780,6 @@ def _fix_econom_floor_cap(variant: dict) -> dict:
             continue
         unit_price = _norm_int(m.get("unit_price") or 0)
         if unit_price > _ECONOM_FLOOR_MAX_PRICE:
-            logger.info(
-                "Econom floor cap: '%s' %d -> %d ₽/м²",
-                m.get("name"), unit_price, _ECONOM_FLOOR_MAX_PRICE
-            )
             m["unit_price"] = _ECONOM_FLOOR_MAX_PRICE
             qty = max(_norm_int(m.get("qty")), 1)
             m["total"] = qty * _ECONOM_FLOOR_MAX_PRICE
@@ -720,10 +807,6 @@ def _fix_import_prices(materials: list[dict]) -> list[dict]:
             if not unit_ok:
                 continue
             if unit_price < rule["min_price"]:
-                logger.info(
-                    "Import price guard: '%s' raised from %d to %d ₽/%s",
-                    m.get("name"), unit_price, rule["min_price"], rule_unit
-                )
                 m["unit_price"] = rule["min_price"]
                 qty = max(_norm_int(m.get("qty")), 1)
                 m["total"] = qty * rule["min_price"]
@@ -736,29 +819,15 @@ def _ensure_primer_before_plaster(works: list[dict], materials: list[dict], curr
     has_plaster_mat = any("штукатур" in (m.get("name") or "").lower() for m in materials)
     if not (has_plaster_work or has_plaster_mat):
         return works, materials
-
     plaster_area = _find_related_work_qty(works, ["штукатур"])
     if plaster_area <= 0:
         return works, materials
-
-    has_primer_work = any("грунт" in (w.get("name") or "").lower() for w in works)
-    has_primer_mat = any("грунт" in (m.get("name") or "").lower() for m in materials)
-
-    if not has_primer_work:
-        unit_price = 80
-        works.append({
-            "name": "Грунтовка основания перед штукатуркой",
-            "unit": "м²", "qty": plaster_area,
-            "unit_price": unit_price, "total": plaster_area * unit_price,
-        })
-    if not has_primer_mat:
+    if not any("грунт" in (w.get("name") or "").lower() for w in works):
+        works.append({"name": "Грунтовка основания перед штукатуркой", "unit": "м²", "qty": plaster_area, "unit_price": 80, "total": plaster_area * 80})
+    if not any("грунт" in (m.get("name") or "").lower() for m in materials):
         consumption, pack_l, unit_price = 0.15, 10.0, 900
         qty = _ceil_int((plaster_area * consumption) / pack_l)
-        materials.append({
-            "name": f"Грунтовка глубокого проникновения, расход {consumption} л/м²",
-            "brand": "Канистра 10 л", "unit": "шт",
-            "qty": qty, "unit_price": unit_price, "total": qty * unit_price,
-        })
+        materials.append({"name": f"Грунтовка глубокого проникновения, расход {consumption} л/м²", "brand": "Канистра 10 л", "unit": "шт", "qty": qty, "unit_price": unit_price, "total": qty * unit_price})
     return works, materials
 
 
@@ -812,10 +881,7 @@ def _ensure_nonempty_variant_fields(variant: dict) -> dict:
     if not variant.get("cons"):
         variant["cons"] = "Стоимость уточняется по финальному проекту."
     if not (variant.get("materials") or []):
-        variant["materials"] = [{
-            "name": "Материалы уточняются по проекту", "brand": "Предварительный расчёт",
-            "unit": "компл", "qty": 1, "unit_price": 1, "total": 1,
-        }]
+        variant["materials"] = [{"name": "Материалы уточняются по проекту", "brand": "Предварительный расчёт", "unit": "компл", "qty": 1, "unit_price": 1, "total": 1}]
     return variant
 
 
@@ -830,7 +896,6 @@ def _fix_works_ratio(works: list[dict], materials: list[dict]) -> list[dict]:
         return works
     target_works = _ceil_int(_MIN_WORKS_RATIO * total_materials / (1 - _MIN_WORKS_RATIO))
     scale = target_works / total_works
-    logger.info("Works ratio fix: %.2f -> %.2f, scale=%.2f", ratio, _MIN_WORKS_RATIO, scale)
     for w in works:
         old = _norm_int(w.get("total"))
         if old <= 0:
@@ -849,17 +914,12 @@ def _fix_variant_completeness(variants: list[dict]) -> list[dict]:
     ref_mats_count = max(len(v.get("materials") or []) for v in variants[:2])
     min_works_required = ref_works_count
     min_mats_required = _ceil_int(ref_mats_count * 0.8)
-
     for i, v in enumerate(variants):
         if i < 2:
             continue
         works_count = len(v.get("works") or [])
         mats_count = len(v.get("materials") or [])
         if works_count < min_works_required or mats_count < min_mats_required:
-            logger.warning(
-                "Variant '%s' incomplete: %d works (need %d), %d mats (need %d)",
-                v.get("name"), works_count, min_works_required, mats_count, min_mats_required
-            )
             v["_incomplete"] = True
     return variants
 
@@ -875,10 +935,6 @@ def _enforce_variant_order(variants: list[dict]) -> list[dict]:
             min_required = _ceil_int(prev_total * (1 + _MIN_TIER_GAP_PCT))
             if total < min_required:
                 diff = min_required - total
-                logger.info(
-                    "Tier gap fix for '%s': total %d -> %d (+%d)",
-                    v.get("name"), total, min_required, diff
-                )
                 if v.get("works"):
                     works_total = sum(_norm_int(w.get("total")) for w in v["works"])
                     if works_total > 0:
@@ -896,23 +952,14 @@ def _enforce_variant_order(variants: list[dict]) -> list[dict]:
                             qty = max(_norm_int(last_w.get("qty")), 1)
                             last_w["unit_price"] = _ceil_int(last_w["total"] / qty)
                     else:
-                        v["works"].append({
-                            "name": "Дополнительные работы сегмента",
-                            "unit": "компл", "qty": 1,
-                            "unit_price": diff, "total": diff,
-                        })
+                        v["works"].append({"name": "Дополнительные работы сегмента", "unit": "компл", "qty": 1, "unit_price": diff, "total": diff})
                 elif v.get("materials"):
                     last_m = v["materials"][-1]
                     last_m["total"] = _norm_int(last_m.get("total")) + diff
                     qty = max(_norm_int(last_m.get("qty")), 1)
                     last_m["unit_price"] = _ceil_int(last_m["total"] / qty)
                 else:
-                    v.setdefault("works", []).append({
-                        "name": "Дополнительные работы сегмента",
-                        "unit": "компл", "qty": 1,
-                        "unit_price": diff, "total": diff,
-                    })
-
+                    v.setdefault("works", []).append({"name": "Дополнительные работы сегмента", "unit": "компл", "qty": 1, "unit_price": diff, "total": diff})
                 total_works = sum(_norm_int(w.get("total")) for w in (v.get("works") or []))
                 total_materials = sum(_norm_int(m.get("total")) for m in (v.get("materials") or []))
                 total = total_works + total_materials
@@ -950,6 +997,7 @@ def _normalize_result(data: dict, project: dict | None = None) -> dict:
         scope = "full_apartment"
 
     for v in (data.get("variants") or data.get("options") or [])[:3]:
+        variant_name = v.get("name") or ""
         works = []
         for w in (v.get("works") or []):
             qty = _norm_int(w.get("qty") or 0)
@@ -978,8 +1026,8 @@ def _normalize_result(data: dict, project: dict | None = None) -> dict:
         works, materials = _fix_floor_area_sync(works, materials, project_area)
         materials = _fix_floor_name_sync(works, materials)
         works, materials = _ensure_skirting_boards(works, materials, project_area)
-        works, materials = _ensure_electrical_section(works, materials, scope, project_area)
-        works, materials = _ensure_plumbing_section(works, materials, scope)
+        works, materials = _ensure_electrical_section(works, materials, scope, project_area, variant_name)
+        works, materials = _ensure_plumbing_section(works, materials, scope, variant_name)
         works = _fix_works_ratio(works, materials)
         works = _filter_zero_rows(works)
         materials = _filter_zero_rows(materials)
@@ -989,7 +1037,7 @@ def _normalize_result(data: dict, project: dict | None = None) -> dict:
         total = total_works + total_materials
 
         variant = {
-            "name": v.get("name") or "",
+            "name": variant_name,
             "style": v.get("style") or "",
             "total_works": total_works, "total_materials": total_materials, "total": total,
             "budget": v.get("budget") or f"{total:,} ₽".replace(",", " "),
@@ -1002,6 +1050,7 @@ def _normalize_result(data: dict, project: dict | None = None) -> dict:
 
     out["variants"] = _fix_variant_completeness(out["variants"])
     out["variants"] = _enforce_variant_order(out["variants"])
+    out = _ensure_contractor_margin_note(out)
 
     totals = [v["total"] for v in out["variants"] if v["total"] > 0]
     if totals:
@@ -1030,10 +1079,12 @@ def _estimate_looks_incomplete(result: dict, scope_info: dict) -> bool:
     if scope == "full_apartment":
         elec_present = any(any(k in (w.get("name") or "").lower() for k in ["элект", "кабел", "щит", "автомат", "узо", "штроб"]) for w in first.get("works") or [])
         plumb_present = any(any(k in (w.get("name") or "").lower() for k in ["сантех", "труб", "вод", "канализ"]) for w in first.get("works") or [])
+        toilet_present = any("унитаз" in (m.get("name") or "").lower() for m in first.get("materials") or [])
         skirting_present = any("плинтус" in (w.get("name") or "").lower() for w in first.get("works") or [])
-        return works_count < 8 or mats_count < 5 or first.get("total", 0) < 250000 or not elec_present or not plumb_present or not skirting_present
+        return works_count < 8 or mats_count < 7 or first.get("total", 0) < 280000 or not elec_present or not plumb_present or not toilet_present or not skirting_present
     if scope == "bathroom":
-        return works_count < 5 or mats_count < 4
+        toilet_present = any("унитаз" in (m.get("name") or "").lower() for m in first.get("materials") or [])
+        return works_count < 5 or mats_count < 5 or not toilet_present
     if scope == "floor_only":
         return works_count < 3 or mats_count < 2
     return False
@@ -1114,10 +1165,7 @@ async def get_estimate(
             try:
                 result = await _try_model(client, model, messages, max_tokens, use_json_mode, project=project)
                 if _estimate_looks_incomplete(result, scope_info):
-                    logger.warning(
-                        "Estimate incomplete for scope=%s via %s, retrying",
-                        scope_info.get("scope"), model
-                    )
+                    logger.warning("Estimate incomplete for scope=%s via %s, retrying", scope_info.get("scope"), model)
                     for v in result.get("variants", []):
                         v.pop("_incomplete", None)
                     messages.append({
@@ -1125,13 +1173,13 @@ async def get_estimate(
                         "content": (
                             "Предыдущая смета неполная. Исправь: "
                             "1) Удали строки с qty=0, unit_price=0 или total=0. "
-                            "2) Электрика обязательна: минимум 4 строки — штробление/прокладка кабеля, кабель, автоматы/УЗО, сборка и монтаж щитка. "
-                            "3) Сантехника обязательна: минимум разводка труб и сантехприборы/фитинги на 4-6 точек. "
-                            "4) При замене пола всегда добавляй установку плинтусов. "
-                            "5) Материал покрытия и работа должны совпадать по названию: если укладка ламината, не оставляй кварцвинил. "
-                            "6) Арифметика: qty×unit_price=total в каждой строке; пересчитай total_works и total как суммы строк. "
-                            "7) Разрыв цен: Оптимальный на 20-30% дороже Эконома, Премиум на 25-50% дороже Оптимального. "
-                            "8) Никаких фраз 'требует уточнения' — замени допущениями или убери секцию."
+                            "2) Электрика: минимум 4 строки работ + кабель, вводной автомат, групповые автоматы (6–8 шт), УЗО (2 шт), бокс щитка — раздельными строками. "
+                            "3) Сантехника: разводка труб + установка приборов (работы); трубы/фитинги, унитаз, раковина, смеситель для ванной, смеситель для кухни, ванна/душевая кабина (материалы). "
+                            "4) При замене пола — установка плинтусов обязательна. "
+                            "5) Материал и работа по полу совпадают по типу. "
+                            "6) Арифметика: qty×unit_price=total; пересчитай total_works и total как суммы строк. "
+                            "7) Разрыв: Оптимальный на 20-30% дороже Эконома, Премиум на 25-50% дороже Оптимального. "
+                            "8) В поле risks: 'Расчёт без учёта маржи подрядчика (+15–30%).'"
                         ),
                     })
                     result = await _try_model(client, model, messages, max_tokens, use_json_mode, project=project)
