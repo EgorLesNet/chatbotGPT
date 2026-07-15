@@ -109,26 +109,14 @@ def _format_estimate(data: dict, paid: bool) -> str:
     return "\n".join(lines)
 
 
-@router.callback_query(F.data == "nav:estimate")
-async def cb_nav_estimate(call: CallbackQuery, state: FSMContext) -> None:
-    await call.answer()
-    await state.set_state(EstimateForm.situation)
-    await call.message.answer(
-        "📝 <b>Опиши ситуацию клиента</b>\n\n"
-        "Что хочет сделать, стиль, цвет, бюджет?\n"
-        "<i>Пример: Замена пола, 50 м², нужен кварцвинил, со стяжкой</i>",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-
-
 @router.message(Command("estimate"))
 async def cmd_estimate(message: Message, state: FSMContext) -> None:
-    await state.set_state(EstimateForm.situation)
+    from handlers.repair_type import repair_type_kb
+    await state.clear()
     await message.answer(
-        "📝 <b>Опиши ситуацию клиента</b>\n\n"
-        "Что хочет сделать, стиль, цвет, бюджет?\n"
-        "<i>Пример: Замена пола, 50 м², нужен кварцвинил, со стяжкой</i>",
-        reply_markup=ReplyKeyboardRemove(),
+        "🔨 <b>Выбери тип ремонта</b>\n\n"
+        "Выбери категорию — нейросеть получит точное задание и рассчитает смету корректно:",
+        reply_markup=repair_type_kb(),
     )
 
 
@@ -137,11 +125,22 @@ async def step_situation(message: Message, state: FSMContext) -> None:
     situation = message.text.strip()
     user = ensure_user(message.from_user)
     paid = is_paid_active(user)
-    await state.update_data(situation=situation, user_id=user["id"])
+    data = await state.get_data()
+    repair_label = data.get("repair_label", "")
+    repair_hint = data.get("repair_hint", "")
+    # Обогащаем запрос к нейросети контекстом типа ремонта
+    enriched_situation = situation
+    if repair_label:
+        enriched_situation = f"[Тип ремонта: {repair_label}] {situation}"
+    await state.update_data(situation=enriched_situation, user_id=user["id"])
     wait_msg = await message.answer("⏳ Составляю смету...\n<i>(15–60 секунд)</i>")
     await message.bot.send_chat_action(message.chat.id, "typing")
     try:
-        estimate = await get_estimate(situation=situation, user_id=user["id"])
+        estimate = await get_estimate(
+            situation=enriched_situation,
+            user_id=user["id"],
+            system_hint=repair_hint,
+        )
         text = _format_estimate(estimate, paid=paid)
         await wait_msg.delete()
         await state.update_data(last_estimate=estimate)
