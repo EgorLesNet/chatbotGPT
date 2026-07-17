@@ -112,7 +112,7 @@ SYSTEM_PROMPT = """
 
 ПРАВИЛА РАСЧЁТА МАТЕРИАЛОВ:
 - quantity = ceiling((площадь × норма расхода) / вес_упаковки). Никогда не ставь произвольно.
-- Для каждого сыпучего/жидкого материала указывай норму расхода в названии или бренде: "Расход 8.5 кг/м²".
+- Для каждого сыпучего/жидкого материала указывай норму расхода в названии или бренде: \"Расход 8.5 кг/м²\".
 - Импортный материал (Польша, Германия, Италия, Бельгия, Финляндия): цена не ниже рынка. Польский/немецкий кварцвинил и ламинат — от 3 500 ₽/м². Итальянская плитка — от 2 500 ₽/м².
 - Эконом: напольное покрытие не дороже 1 900 ₽/м².
 - Каждая строка материала должна совпадать по типу покрытия/системы с соответствующей строкой работы. Если работа — «Укладка ламината», в материалах не должно быть «Кварцвинил».
@@ -143,7 +143,7 @@ SYSTEM_PROMPT = """
 
 ПРАВИЛА ВЫВОДА:
 - Никогда не включай фразы «требует уточнения», «неуверен в цифрах», «рекомендуется уточнить».
-- В поле "risks" всегда добавляй примечание: "Расчёт отражает стоимость материалов и прямых работ без учёта маржи подрядной организации (обычно +15–30%). Цены компаний «под ключ» включают накладные расходы и прибыль."
+- В поле \"risks\" всегда добавляй примечание: \"Расчёт отражает стоимость материалов и прямых работ без учёта маржи подрядной организации (обычно +15–30%). Цены компаний «под ключ» включают накладные расходы и прибыль.\"
 
 ОСТАЛЬНЫЕ ПРАВИЛА:
 - total = total_works + total_materials.
@@ -152,49 +152,49 @@ SYSTEM_PROMPT = """
 
 Верни ONLY raw JSON:
 {
-  "summary": "",
-  "cost_min": 0,
-  "cost_max": 0,
-  "currency": "₽",
-  "variants": [
+  \"summary\": \"\",
+  \"cost_min\": 0,
+  \"cost_max\": 0,
+  \"currency\": \"₽\",
+  \"variants\": [
     {
-      "name": "Эконом",
-      "style": "Бюджетный",
-      "total_works": 0,
-      "total_materials": 0,
-      "total": 0,
-      "budget": "",
-      "works": [{"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
-      "materials": [{"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
-      "pros": "",
-      "cons": ""
+      \"name\": \"Эконом\",
+      \"style\": \"Бюджетный\",
+      \"total_works\": 0,
+      \"total_materials\": 0,
+      \"total\": 0,
+      \"budget\": \"\",
+      \"works\": [{\"name\": \"\", \"unit\": \"\", \"qty\": 0, \"unit_price\": 0, \"total\": 0}],
+      \"materials\": [{\"name\": \"\", \"brand\": \"\", \"unit\": \"\", \"qty\": 0, \"unit_price\": 0, \"total\": 0}],
+      \"pros\": \"\",
+      \"cons\": \"\"
     },
     {
-      "name": "Оптимальный",
-      "style": "Средний",
-      "total_works": 0,
-      "total_materials": 0,
-      "total": 0,
-      "budget": "",
-      "works": [{"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
-      "materials": [{"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
-      "pros": "",
-      "cons": ""
+      \"name\": \"Оптимальный\",
+      \"style\": \"Средний\",
+      \"total_works\": 0,
+      \"total_materials\": 0,
+      \"total\": 0,
+      \"budget\": \"\",
+      \"works\": [{\"name\": \"\", \"unit\": \"\", \"qty\": 0, \"unit_price\": 0, \"total\": 0}],
+      \"materials\": [{\"name\": \"\", \"brand\": \"\", \"unit\": \"\", \"qty\": 0, \"unit_price\": 0, \"total\": 0}],
+      \"pros\": \"\",
+      \"cons\": \"\"
     },
     {
-      "name": "Премиум",
-      "style": "Дизайнерский",
-      "total_works": 0,
-      "total_materials": 0,
-      "total": 0,
-      "budget": "",
-      "works": [{"name": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
-      "materials": [{"name": "", "brand": "", "unit": "", "qty": 0, "unit_price": 0, "total": 0}],
-      "pros": "",
-      "cons": ""
+      \"name\": \"Премиум\",
+      \"style\": \"Дизайнерский\",
+      \"total_works\": 0,
+      \"total_materials\": 0,
+      \"total\": 0,
+      \"budget\": \"\",
+      \"works\": [{\"name\": \"\", \"unit\": \"\", \"qty\": 0, \"unit_price\": 0, \"total\": 0}],
+      \"materials\": [{\"name\": \"\", \"brand\": \"\", \"unit\": \"\", \"qty\": 0, \"unit_price\": 0, \"total\": 0}],
+      \"pros\": \"\",
+      \"cons\": \"\"
     }
   ],
-  "risks": ""
+  \"risks\": \"\"
 }
 """.strip()
 
@@ -221,11 +221,11 @@ SYSTEM_PROMPT_GROQ = (
     "В поле risks всегда добавляй: 'Расчёт без учёта маржи подрядчика (+15–30%). Цены компаний под ключ включают накладные расходы.' "
     "Никогда не ставь cost_min/cost_max в 0; не отдавай пустые варианты. "
     "Отвечай ONLY чистым JSON:"
-    '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
-    '{"name":"Эконом","style":"Бюджетный","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
-    '{"name":"Оптимальный","style":"Средний","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
-    '{"name":"Премиум","style":"Дизайнерский","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""}'
-    '],"risks":""}'
+    '{\"summary\":\"\",\"cost_min\":0,\"cost_max\":0,\"currency\":\"₽\",\"variants\":['
+    '{\"name\":\"Эконом\",\"style\":\"Бюджетный\",\"total_works\":0,\"total_materials\":0,\"total\":0,\"budget\":\"\",\"works\":[{\"name\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"materials\":[{\"name\":\"\",\"brand\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"pros\":\"\",\"cons\":\"\"},'
+    '{\"name\":\"Оптимальный\",\"style\":\"Средний\",\"total_works\":0,\"total_materials\":0,\"total\":0,\"budget\":\"\",\"works\":[{\"name\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"materials\":[{\"name\":\"\",\"brand\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"pros\":\"\",\"cons\":\"\"},'
+    '{\"name\":\"Премиум\",\"style\":\"Дизайнерский\",\"total_works\":0,\"total_materials\":0,\"total\":0,\"budget\":\"\",\"works\":[{\"name\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"materials\":[{\"name\":\"\",\"brand\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"pros\":\"\",\"cons\":\"\"}'
+    '],\"risks\":\"\"}'
 )
 
 SYSTEM_PROMPT_LOCAL = (
@@ -241,11 +241,11 @@ SYSTEM_PROMPT_LOCAL = (
     "Без фраз 'требует уточнения' и подобных. "
     "В поле risks: 'Расчёт без учёта маржи подрядчика (+15–30%).' "
     "cost_min/cost_max = min/max total. Не оставляй пустые варианты. "
-    '{"summary":"","cost_min":0,"cost_max":0,"currency":"₽","variants":['
-    '{"name":"Эконом","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
-    '{"name":"Оптимальный","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
-    '{"name":"Премиум","style":"","total_works":0,"total_materials":0,"total":0,"budget":"","works":[{"name":"","unit":"","qty":0,"unit_price":0,"total":0}],"materials":[{"name":"","brand":"","unit":"","qty":0,"unit_price":0,"total":0}],"pros":"","cons":""},'
-    '],"risks":""}'
+    '{\"summary\":\"\",\"cost_min\":0,\"cost_max\":0,\"currency\":\"₽\",\"variants\":['
+    '{\"name\":\"Эконом\",\"style\":\"\",\"total_works\":0,\"total_materials\":0,\"total\":0,\"budget\":\"\",\"works\":[{\"name\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"materials\":[{\"name\":\"\",\"brand\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"pros\":\"\",\"cons\":\"\"},'
+    '{\"name\":\"Оптимальный\",\"style\":\"\",\"total_works\":0,\"total_materials\":0,\"total\":0,\"budget\":\"\",\"works\":[{\"name\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"materials\":[{\"name\":\"\",\"brand\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"pros\":\"\",\"cons\":\"\"},'
+    '{\"name\":\"Премиум\",\"style\":\"\",\"total_works\":0,\"total_materials\":0,\"total\":0,\"budget\":\"\",\"works\":[{\"name\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"materials\":[{\"name\":\"\",\"brand\":\"\",\"unit\":\"\",\"qty\":0,\"unit_price\":0,\"total\":0}],\"pros\":\"\",\"cons\":\"\"},'
+    '],\"risks\":\"\"}'
 )
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -370,30 +370,79 @@ async def _get_model_chain(api_key: str) -> list[tuple[str, str]]:
     return chain
 
 
-def _detect_scope(situation: str) -> dict:
-    s = (situation or "").lower()
+def _detect_scope(situation: str, repair_type: str = "") -> dict:
+    s = f"{(repair_type or '').lower()} {(situation or '').lower()}"
+
     full_markers = [
-        "полный ремонт", "ремонт под ключ", "капитальный ремонт",
+        "full_renovation", "полный ремонт", "ремонт под ключ", "капитальный ремонт",
         "современный ремонт", "квартира целиком", "всей квартиры",
         "с инженер", "с сантехник", "электрик", "чернов", "чистов",
     ]
-    floor_markers = ["пол", "стяжк", "кварцвинил", "ламинат", "плитк", "линолеум"]
-    bath_markers = ["ванн", "сануз", "туалет", "душ"]
-    paint_markers = ["покраск", "обои", "шпаклев", "штукатур"]
+    floor_markers = ["floor", "пол", "стяжк", "кварцвинил", "ламинат", "плитк", "линолеум"]
+    bath_markers = ["bathroom", "ванн", "сануз", "туалет", "душ"]
+    paint_markers = ["painting", "wallpaper", "покраск", "обои", "шпаклев", "штукатур"]
+    wiring_markers = ["wiring", "проводк", "электрик", "розет", "выключател", "щиток", "автомат", "узо", "кабель"]
+    ceiling_markers = ["ceiling", "потол", "натяжн", "гкл", "гипсокартон", "побелк"]
+    kitchen_markers = ["kitchen", "кухн", "фартук", "мойк", "смеситель для кухни", "вытяжк"]
+    doors_windows_markers = ["doors_windows", "двер", "окн", "подоконник", "откос", "добор", "наличник"]
+    balcony_markers = ["balcony", "балкон", "лоджи", "остеклен", "утеплен"]
+    cosmetic_markers = ["cosmetic", "косметическ", "без замены коммуникаций", "освежить ремонт"]
+    plumbing_markers = ["plumbing", "сантех", "труб", "хвс", "гвс", "канализ", "смесител", "раковин", "унитаз"]
+    tiles_markers = ["tiles", "плитк", "керамогранит", "затирк", "плиточный клей"]
 
     if any(x in s for x in full_markers):
         return {
             "scope": "full_apartment",
             "required_sections": [
-                "демонтаж", "черновые стены", "черновые полы",
+                "демонтаж", "черновые стены", "черновые полы", "черновые потолки",
                 "электрика", "сантехника", "чистовая отделка стен",
-                "чистовые полы", "потолки", "двери/плинтусы/фурнитура",
+                "чистовые полы", "чистовые потолки", "двери/плинтусы/фурнитура",
             ],
         }
     if any(x in s for x in bath_markers):
         return {
             "scope": "bathroom",
             "required_sections": ["демонтаж", "сантехника", "гидроизоляция", "плиточные работы", "чистовой монтаж"],
+        }
+    if any(x in s for x in kitchen_markers):
+        return {
+            "scope": "kitchen",
+            "required_sections": ["подготовка", "стены/фартук", "пол", "потолок", "электрика", "сантехника"],
+        }
+    if any(x in s for x in wiring_markers):
+        return {
+            "scope": "wiring",
+            "required_sections": ["демонтаж старой проводки", "штробление", "прокладка кабеля", "щиток", "розетки/выключатели"],
+        }
+    if any(x in s for x in plumbing_markers):
+        return {
+            "scope": "plumbing",
+            "required_sections": ["разводка труб", "канализация", "установка сантехприборов"],
+        }
+    if any(x in s for x in ceiling_markers):
+        return {
+            "scope": "ceiling",
+            "required_sections": ["демонтаж", "подготовка основания", "выравнивание/монтаж", "финишная отделка"],
+        }
+    if any(x in s for x in doors_windows_markers):
+        return {
+            "scope": "doors_windows",
+            "required_sections": ["демонтаж", "монтаж новых конструкций", "откосы/доборы", "фурнитура"],
+        }
+    if any(x in s for x in balcony_markers):
+        return {
+            "scope": "balcony",
+            "required_sections": ["остекление", "утепление", "отделка", "электрика"],
+        }
+    if any(x in s for x in cosmetic_markers):
+        return {
+            "scope": "cosmetic",
+            "required_sections": ["подготовка поверхностей", "стены", "потолок", "пол"],
+        }
+    if any(x in s for x in tiles_markers):
+        return {
+            "scope": "tiles",
+            "required_sections": ["подготовка основания", "гидроизоляция", "укладка плитки", "затирка"],
         }
     if any(x in s for x in floor_markers):
         return {
@@ -655,51 +704,57 @@ def _get_tier_key(variant_name: str) -> str:
 
 
 def _ensure_electrical_section(works: list[dict], materials: list[dict], scope: str, project_area: float | None, variant_name: str = "") -> tuple[list[dict], list[dict]]:
-    if scope != "full_apartment":
+    if scope not in ("full_apartment", "wiring", "kitchen", "balcony"):
         return works, materials
-    elec_work_count = sum(1 for w in works if any(k in (w.get("name") or "").lower() for k in ["элект", "кабел", "штроб", "щит", "автомат", "узо"]))
+    elec_work_count = sum(1 for w in works if any(k in (w.get("name") or "").lower() for k in ["элект", "кабел", "штроб", "щит", "автомат", "узо", "розет", "выключ"]))
     elec_mat_count = sum(1 for m in materials if any(k in (m.get("name") or "").lower() for k in ["кабел", "щит", "автомат", "узо", "розет", "выключ", "вводной"]))
-    cable_len = max(60, _ceil_int((project_area or 40) * 2.2))
+    cable_len = max(20, _ceil_int((project_area or 20) * 2.2))
 
     if elec_work_count < 2:
         works.append({"name": "Штробление и прокладка кабеля", "unit": "м", "qty": cable_len, "unit_price": 250, "total": cable_len * 250})
-        works.append({"name": "Сборка и монтаж щитка", "unit": "шт", "qty": 1, "unit_price": 6500, "total": 6500})
+        works.append({"name": "Установка розеток и выключателей", "unit": "шт", "qty": max(6, _ceil_int((project_area or 20) / 3)), "unit_price": 450, "total": max(6, _ceil_int((project_area or 20) / 3)) * 450})
+        if scope in ("full_apartment", "wiring"):
+            works.append({"name": "Сборка и монтаж щитка", "unit": "шт", "qty": 1, "unit_price": 6500, "total": 6500})
 
-    # Добавляем детализацию щитка (бокс, вводной, групповые, УЗО) если не хватает
     has_main_breaker = any("вводной" in (m.get("name") or "").lower() for m in materials)
     has_group_breakers = any("групповые" in (m.get("name") or "").lower() or "автомат" in (m.get("name") or "").lower() for m in materials)
     has_rcd = any("узо" in (m.get("name") or "").lower() or "дифавтомат" in (m.get("name") or "").lower() for m in materials)
-    has_panel_box = any("щит" in (m.get("name") or "").lower() and "бокс" not in (m.get("name") or "").lower() or "бокс" in (m.get("name") or "").lower() for m in materials)
+    has_panel_box = any(("щит" in (m.get("name") or "").lower()) or ("бокс" in (m.get("name") or "").lower()) for m in materials)
 
     tier = _get_tier_key(variant_name)
     panel_items = _ELECTRICAL_PANEL_ITEMS.get(tier, _ELECTRICAL_PANEL_ITEMS["оптимальный"])
 
-    if not has_panel_box:
-        materials.append(dict(panel_items[0]))  # бокс щитка
-    if not has_main_breaker:
-        materials.append(dict(panel_items[1]))  # вводной автомат
-    if not has_group_breakers:
-        materials.append(dict(panel_items[2]))  # групповые автоматы
-    if not has_rcd:
-        materials.append(dict(panel_items[3]))  # УЗО
+    if scope in ("full_apartment", "wiring"):
+        if not has_panel_box:
+            materials.append(dict(panel_items[0]))
+        if not has_main_breaker:
+            materials.append(dict(panel_items[1]))
+        if not has_group_breakers:
+            materials.append(dict(panel_items[2]))
+        if not has_rcd:
+            materials.append(dict(panel_items[3]))
 
-    # Кабель — если вообще нет
-    if elec_mat_count < 2 and not any("кабел" in (m.get("name") or "").lower() for m in materials):
+    if not any("кабел" in (m.get("name") or "").lower() for m in materials):
         materials.append({"name": "Кабель ВВГнг-LS", "brand": "3x2.5 / 3x1.5", "unit": "м", "qty": cable_len, "unit_price": 95, "total": cable_len * 95})
+    if not any("розет" in (m.get("name") or "").lower() for m in materials):
+        socket_qty = max(6, _ceil_int((project_area or 20) / 3))
+        materials.append({"name": "Розетки", "brand": "Белые, скрытый монтаж", "unit": "шт", "qty": socket_qty, "unit_price": 250, "total": socket_qty * 250})
+    if not any("выключ" in (m.get("name") or "").lower() for m in materials):
+        switch_qty = max(2, _ceil_int((project_area or 20) / 10))
+        materials.append({"name": "Выключатели", "brand": "Одноклавишные/двухклавишные", "unit": "шт", "qty": switch_qty, "unit_price": 280, "total": switch_qty * 280})
 
     return works, materials
 
 
 def _ensure_plumbing_section(works: list[dict], materials: list[dict], scope: str, variant_name: str = "") -> tuple[list[dict], list[dict]]:
-    if scope not in ("full_apartment", "bathroom"):
+    if scope not in ("full_apartment", "bathroom", "plumbing", "kitchen"):
         return works, materials
 
     has_plumbing_work = any(any(k in (w.get("name") or "").lower() for k in ["сантех", "труб", "вод", "канализ", "установк", "подключ"]) for w in works)
     has_pipe_mat = any(any(k in (m.get("name") or "").lower() for k in ["труб", "фитинг", "коллектор"]) for m in materials)
 
-    # Проверяем наличие приборов
     has_toilet = any("унитаз" in (m.get("name") or "").lower() for m in materials)
-    has_sink = any("раковин" in (m.get("name") or "").lower() for m in materials)
+    has_sink = any("раковин" in (m.get("name") or "").lower() or "мойка" in (m.get("name") or "").lower() for m in materials)
     has_faucet_bath = any("смеситель" in (m.get("name") or "").lower() and ("ванн" in (m.get("name") or "").lower() or "душ" in (m.get("name") or "").lower()) for m in materials)
     has_faucet_kitchen = any("смеситель" in (m.get("name") or "").lower() and "кухн" in (m.get("name") or "").lower() for m in materials)
     has_bath_shower = any("ванн" in (m.get("name") or "").lower() or "душев" in (m.get("name") or "").lower() for m in materials)
@@ -710,7 +765,6 @@ def _ensure_plumbing_section(works: list[dict], materials: list[dict], scope: st
     points = 5
     if not has_plumbing_work:
         works.append({"name": "Разводка труб водоснабжения и канализации", "unit": "точка", "qty": points, "unit_price": 4500, "total": points * 4500})
-    # Добавляем монтаж приборов если нет
     has_install_work = any(any(k in (w.get("name") or "").lower() for k in ["установк", "подключ", "монтаж сантех"]) for w in works)
     if not has_install_work:
         works.append({"name": "Установка и подключение сантехприборов", "unit": "шт", "qty": points, "unit_price": 2000, "total": points * 2000})
@@ -718,23 +772,24 @@ def _ensure_plumbing_section(works: list[dict], materials: list[dict], scope: st
     if not has_pipe_mat:
         materials.append({"name": "Трубы и фитинги для сантехники", "brand": "На 4-6 точек", "unit": "компл", "qty": 1, "unit_price": 18000, "total": 18000})
 
-    # Добавляем отсутствующие приборы
-    if not has_toilet:
-        materials.append(dict(fixtures[0]))  # унитаз
-    if not has_sink:
-        materials.append(dict(fixtures[1]))  # раковина
-    if not has_faucet_bath:
-        materials.append(dict(fixtures[2]))  # смеситель ванной
-    if scope == "full_apartment" and not has_faucet_kitchen:
-        materials.append(dict(fixtures[3]))  # смеситель кухни
-    if not has_bath_shower:
-        materials.append(dict(fixtures[4]))  # ванна/душ
+    if scope in ("full_apartment", "bathroom", "plumbing"):
+        if not has_toilet:
+            materials.append(dict(fixtures[0]))
+        if not has_sink:
+            materials.append(dict(fixtures[1]))
+        if not has_faucet_bath:
+            materials.append(dict(fixtures[2]))
+        if not has_bath_shower:
+            materials.append(dict(fixtures[4]))
+    if scope in ("full_apartment", "kitchen") and not has_sink:
+        materials.append({"name": "Мойка кухонная", "brand": "Нержавеющая сталь / композит", "unit": "шт", "qty": 1, "unit_price": 6000 if tier != "эконом" else 3500, "total": 6000 if tier != "эконом" else 3500})
+    if scope in ("full_apartment", "kitchen") and not has_faucet_kitchen:
+        materials.append(dict(fixtures[3]))
 
     return works, materials
 
 
 def _ensure_contractor_margin_note(out: dict) -> dict:
-    """Добавляет примечание о наценке подрядчика в поле risks, если его нет."""
     risks = out.get("risks") or ""
     if "маржи" not in risks.lower() and "накладн" not in risks.lower() and "+15" not in risks:
         if risks:
@@ -995,6 +1050,14 @@ def _normalize_result(data: dict, project: dict | None = None) -> dict:
     summary_text += f" {data.get('summary') or ''}"
     if any(x in summary_text.lower() for x in ["полный ремонт", "под ключ", "капиталь", "квартира целиком"]):
         scope = "full_apartment"
+    elif any(x in summary_text.lower() for x in ["ванн", "сануз", "душ"]):
+        scope = "bathroom"
+    elif any(x in summary_text.lower() for x in ["кухн", "фартук", "мойка"]):
+        scope = "kitchen"
+    elif any(x in summary_text.lower() for x in ["проводк", "розет", "выключ", "щиток"]):
+        scope = "wiring"
+    elif any(x in summary_text.lower() for x in ["сантех", "труб", "смесител", "унитаз"]):
+        scope = "plumbing"
 
     for v in (data.get("variants") or data.get("options") or [])[:3]:
         variant_name = v.get("name") or ""
@@ -1085,6 +1148,11 @@ def _estimate_looks_incomplete(result: dict, scope_info: dict) -> bool:
     if scope == "bathroom":
         toilet_present = any("унитаз" in (m.get("name") or "").lower() for m in first.get("materials") or [])
         return works_count < 5 or mats_count < 5 or not toilet_present
+    if scope == "wiring":
+        sockets_present = any("розет" in (m.get("name") or "").lower() for m in first.get("materials") or [])
+        return works_count < 3 or mats_count < 4 or not sockets_present
+    if scope == "plumbing":
+        return works_count < 2 or mats_count < 4
     if scope == "floor_only":
         return works_count < 3 or mats_count < 2
     return False
@@ -1119,13 +1187,14 @@ async def get_estimate(
     project: dict | None = None,
     user_id: int | None = None,
     system_hint: str = "",
+    repair_type: str = "",
 ) -> dict:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     model_chain = await _get_model_chain(api_key)
     if not model_chain:
         raise RuntimeError("Нет доступных моделей")
 
-    scope_info = _detect_scope(situation)
+    scope_info = _detect_scope(situation, repair_type=repair_type)
     materials_context_full = await get_materials_context(situation, limit=12)
     materials_context_groq = await get_materials_context(situation, limit=3)
     user_rates = get_user_rates(user_id) if user_id else []
@@ -1149,7 +1218,7 @@ async def get_estimate(
             max_tokens = 5200
 
         if system_hint:
-            system_prompt = system_hint + "\n\n" + system_prompt
+            system_prompt = system_prompt + "\n\n" + "СПЕЦИАЛЬНЫЕ ИНСТРУКЦИИ ДЛЯ ТИПА СМЕТЫ:\n" + system_hint
 
         use_json_mode = local or groq
         user_msg = user_msg_groq if groq else user_msg_full
