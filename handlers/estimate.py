@@ -67,9 +67,9 @@ def _format_estimate(data: dict, paid: bool) -> str:
 
     variants = data.get("variants", [])[:3]
     if not variants:
-        return "⚠️ Не удалось сформировать смету."
+        return "⚠️ Не удалось сформировать смету. Попробуй ещё раз или опиши задачу подробнее."
 
-    # --- Эконом — полностью (free) ---
+    # Эконом — полная детализация (free + paid)
     eco = variants[0]
     lines.append(f"\n{_ICONS[0]} <b>{eco.get('name', 'Эконом')} — {eco.get('style', '')}</b>")
     lines.append(f"   💵 Итого: <b>{_fmt(eco.get('total', 0))} {cur}</b>")
@@ -84,7 +84,7 @@ def _format_estimate(data: dict, paid: bool) -> str:
     lines.append(f"\n   ✅ {eco.get('pros', '')}")
     lines.append(f"   ⚠️ {eco.get('cons', '')}")
 
-    # --- Оптимальный и Премиум — тизер ---
+    # Оптимальный и Премиум — тизер для free, полная детализация для paid
     for idx, v in enumerate(variants[1:], start=1):
         lines.append("")
         lines.append(f"{_ICONS[idx]} <b>{v.get('name', '')} — {v.get('style', '')}</b>")
@@ -94,17 +94,17 @@ def _format_estimate(data: dict, paid: bool) -> str:
         )
         n_works = len(v.get("works", []))
         n_mats = len(v.get("materials", []))
-        lines.append(f"   📦 {n_works} этап(а) работ · {n_mats} позиций материалов")
+        lines.append(f"   📦 {n_works} позиций работ · {n_mats} позиций материалов")
         lines.append(f"   ✅ {v.get('pros', '')}")
         lines.append(f"   ⚠️ {v.get('cons', '')}")
         if paid:
-            lines.append("   🔓 Полная детализация в PDF")
+            lines.append("   🔓 Полная детализация доступна в PDF")
         else:
-            lines.append("   🔒 <i>Точные материалы и смета — в paid-плане</i>")
+            lines.append("   🔒 <i>Детализация по позициям — в paid-плане</i>")
 
     risks = data.get("risks", "")
     if risks:
-        lines.append(f"\n🔧 <b>Риски:</b> {risks}")
+        lines.append(f"\nℹ️ <b>Важно знать:</b> {risks}")
 
     return "\n".join(lines)
 
@@ -114,8 +114,8 @@ async def cmd_estimate(message: Message, state: FSMContext) -> None:
     from handlers.repair_type import repair_type_kb
     await state.clear()
     await message.answer(
-        "🔨 <b>Выбери тип ремонта</b>\n\n"
-        "Выбери категорию — нейросеть получит точное задание и рассчитает смету корректно:",
+        "📋 <b>Новая смета</b>\n\n"
+        "Выбери тип ремонта — бот задаст правильные параметры расчёта:",
         reply_markup=repair_type_kb(),
     )
 
@@ -128,18 +128,19 @@ async def step_situation(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     repair_label = data.get("repair_label", "")
     repair_hint = data.get("repair_hint", "")
-    # Обогащаем запрос к нейросети контекстом типа ремонта
+    repair_type = data.get("repair_type", "")
     enriched_situation = situation
     if repair_label:
         enriched_situation = f"[Тип ремонта: {repair_label}] {situation}"
     await state.update_data(situation=enriched_situation, user_id=user["id"])
-    wait_msg = await message.answer("⏳ Составляю смету...\n<i>(15–60 секунд)</i>")
+    wait_msg = await message.answer("⏳ Считаю смету...\n<i>Обычно занимает 15–60 секунд</i>")
     await message.bot.send_chat_action(message.chat.id, "typing")
     try:
         estimate = await get_estimate(
             situation=enriched_situation,
             user_id=user["id"],
             system_hint=repair_hint,
+            repair_type=repair_type,
         )
         text = _format_estimate(estimate, paid=paid)
         await wait_msg.delete()
@@ -150,7 +151,10 @@ async def step_situation(message: Message, state: FSMContext) -> None:
     except Exception:
         logger.exception("Estimate failed")
         await wait_msg.delete()
-        await message.answer("⏳ Нейросеть перегружена. Попробуй через несколько секунд.")
+        await message.answer(
+            "😔 Не удалось получить ответ от нейросети. Попробуй через несколько секунд.\n"
+            "Если ошибка повторяется — опиши задачу немного иначе."
+        )
 
 
 @router.callback_query(F.data == "estimate:add_to_project")
@@ -163,14 +167,15 @@ async def cb_add_to_project(call: CallbackQuery, state: FSMContext) -> None:
             [InlineKeyboardButton(text=p["title"], callback_data=f"estimate:proj:{p['id']}")]
             for p in projects[-5:]
         ] + [
-            [InlineKeyboardButton(text="➕ Создать новый", callback_data="estimate:new_project")],
+            [InlineKeyboardButton(text="➕ Создать новый проект", callback_data="estimate:new_project")],
             [InlineKeyboardButton(text="◀️ Главное меню", callback_data="nav:menu")],
         ])
-        await call.message.answer("📂 <b>Выбери проект</b>:", reply_markup=kb)
+        await call.message.answer("📂 <b>В какой проект сохранить смету?</b>", reply_markup=kb)
     else:
         await state.set_state(EstimateForm.new_project_title)
         await call.message.answer(
-            "🏗 Проектов пока нет. Создаём новый:\n\nШаг 1/3 — название объекта:",
+            "📂 Проектов пока нет. Создаём первый.\n\n"
+            "<b>Шаг 1 из 3</b> — название объекта (например: Квартира Иванова, ул. Ленина 5):",
             reply_markup=ReplyKeyboardRemove(),
         )
 
@@ -179,7 +184,10 @@ async def cb_add_to_project(call: CallbackQuery, state: FSMContext) -> None:
 async def cb_new_project(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     await state.set_state(EstimateForm.new_project_title)
-    await call.message.answer("Шаг 1/3 — название объекта:", reply_markup=ReplyKeyboardRemove())
+    await call.message.answer(
+        "<b>Шаг 1 из 3</b> — название объекта (например: Квартира Иванова, ул. Ленина 5):",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 @router.callback_query(F.data.startswith("estimate:proj:"))
@@ -193,25 +201,28 @@ async def cb_pick_project(call: CallbackQuery, state: FSMContext) -> None:
     full_user = get_user(user["id"])
     project = next((p for p in full_user.get("projects", []) if p["id"] == proj_id), None)
     if not project:
-        await call.message.answer("⚠️ Проект не найден.")
+        await call.message.answer("⚠️ Проект не найден. Попробуй выбрать снова.")
         return
     project.setdefault("estimates", []).append(estimate)
     save_user(full_user)
-    await call.message.answer(f"✅ Смета сохранена в проект <b>{project['title']}</b>.", reply_markup=back_kb())
+    await call.message.answer(
+        f"✅ Смета сохранена в проект <b>{project['title']}</b>.",
+        reply_markup=back_kb(),
+    )
 
 
 @router.message(EstimateForm.new_project_title)
 async def step_new_title(message: Message, state: FSMContext) -> None:
     await state.update_data(new_title=message.text.strip())
     await state.set_state(EstimateForm.new_project_type)
-    await message.answer("Шаг 2/3 — тип объекта:", reply_markup=TYPE_KB)
+    await message.answer("<b>Шаг 2 из 3</b> — тип объекта:", reply_markup=TYPE_KB)
 
 
 @router.message(EstimateForm.new_project_type)
 async def step_new_type(message: Message, state: FSMContext) -> None:
     await state.update_data(new_type=message.text.strip())
     await state.set_state(EstimateForm.new_project_area)
-    await message.answer("Шаг 3/3 — площадь в м²:", reply_markup=ReplyKeyboardRemove())
+    await message.answer("<b>Шаг 3 из 3</b> — общая площадь объекта в м²:", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(EstimateForm.new_project_area)
@@ -223,7 +234,7 @@ async def step_new_area(message: Message, state: FSMContext) -> None:
         if area <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("⚠️ Введи корректное число, например: 42")
+        await message.answer("⚠️ Введи число, например: 42")
         return
     data = await state.get_data()
     estimate = data.get("last_estimate", {})
@@ -253,19 +264,28 @@ async def cb_pdf(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     user = ensure_user(call.from_user)
     if not is_paid_active(user):
-        await call.message.answer("🔒 PDF доступен в paid-плане. /subscribe", reply_markup=back_kb())
+        await call.message.answer(
+            "🔒 PDF доступен в paid-плане.\nПерейди в раздел Подписка, чтобы подключить.",
+            reply_markup=back_kb(),
+        )
         return
     data = await state.get_data()
     estimate = data.get("last_estimate")
     if not estimate:
-        await call.message.answer("⚠️ Сначала сделай смету /estimate.", reply_markup=back_kb())
+        await call.message.answer(
+            "⚠️ Смета не найдена. Сначала сформируй смету через раздел 📋 Смета.",
+            reply_markup=back_kb(),
+        )
         return
     try:
         pdf_path = generate_estimate_pdf(estimate)
         with open(pdf_path, "rb") as f:
             await call.message.answer_document(document=f, caption="📄 Смета для заказчика")
     except NotImplementedError:
-        await call.message.answer("⏳ PDF в разработке. Уведомим когда будет готова.", reply_markup=back_kb())
+        await call.message.answer(
+            "⏳ Выгрузка PDF пока в разработке. Уведомим, когда появится.",
+            reply_markup=back_kb(),
+        )
     except Exception:
         logger.exception("PDF generation failed")
-        await call.message.answer("⚠️ Ошибка генерации PDF.", reply_markup=back_kb())
+        await call.message.answer("⚠️ Не удалось создать PDF. Попробуй позже.", reply_markup=back_kb())

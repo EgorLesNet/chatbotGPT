@@ -18,13 +18,16 @@ def _menu_text(user: dict) -> str:
     return (
         "🤖 <b>Prorab AI</b>\n"
         "────────────────────\n"
+        "Бот помогает составить предварительную смету ремонта за минуту.\n"
+        "Упрощает работу прорабам.\n"
+        "────────────────────\n"
         f"{plan_icon} План: <b>{plan}</b>\n"
         f"📁 Проектов/месяц: <b>{limits['projects_per_month_label']}</b>\n"
         "────────────────────\n"
-        "📋 Смета — описываешь ситуацию, бот считает\n"
-        "📂 Проекты — карточки объектов\n"
-        "💸 Расценки — твои ставки на работы\n"
-        "💳 Подписка — free / paid-план"
+        "📋 <b>Смета</b> — опиши задачу, бот рассчитает 3 варианта\n"
+        "📂 <b>Проекты</b> — карточки объектов с историей смет\n"
+        "💸 <b>Расценки</b> — твои ставки на работы (бот их учитывает)\n"
+        "💳 <b>Подписка</b> — free / paid-план"
     )
 
 
@@ -60,7 +63,7 @@ async def cb_nav_status(call: CallbackQuery) -> None:
     plan = get_plan_name(user)
     paid_text = "активна" if is_paid_active(user) else "не активна"
     await call.message.answer(
-        "📊 <b>Статус</b>\n\n"
+        "📊 <b>Статус аккаунта</b>\n\n"
         f"План: <b>{plan}</b>\n"
         f"Подписка: <b>{paid_text}</b>\n"
         f"Оплачено до: <b>{user.get('paid_until') or '—'}</b>\n"
@@ -81,11 +84,11 @@ async def cb_nav_subscribe(call: CallbackQuery) -> None:
     plan_icon = "💳" if active else "🆓"
     await call.message.answer(
         f"💳 <b>Подписка</b>\n\n"
-        f"{plan_icon} План: <b>{plan}</b>\n"
-        f"Статус: <b>{'активна' if active else 'free'}</b>\n"
+        f"{plan_icon} Текущий план: <b>{plan}</b>\n"
+        f"Статус: <b>{'активна' if active else 'не активна'}</b>\n"
         f"Оплачено до: <b>{user.get('paid_until') or '—'}</b>\n\n"
-        "🆓 <b>Free</b> — 1 проект/мес, бюджетный вариант целиком\n"
-        "💳 <b>Paid</b> — безлимит проектов, все 3 варианта целиком, PDF",
+        "🆓 <b>Free</b> — 1 проект в месяц, только вариант «Эконом» целиком\n"
+        "💳 <b>Paid</b> — безлимит проектов, все 3 варианта с детализацией, выгрузка PDF",
         reply_markup=back_kb(),
     )
     await call.answer()
@@ -101,7 +104,7 @@ async def cmd_status(message: Message) -> None:
     plan = get_plan_name(user)
     paid_text = "активна" if is_paid_active(user) else "не активна"
     await message.answer(
-        "📊 <b>Статус</b>\n\n"
+        "📊 <b>Статус аккаунта</b>\n\n"
         f"План: <b>{plan}</b>\n"
         f"Подписка: <b>{paid_text}</b>\n"
         f"Оплачено до: <b>{user.get('paid_until') or '—'}</b>\n"
