@@ -16,6 +16,8 @@ from handlers.rates import router as rates_router
 from handlers.start import router as start_router
 from handlers.subscribe import router as subscribe_router
 from handlers.voice import router as voice_router
+from handlers.payment import router as payment_router, tribute_webhook_handler
+from utils.log_middleware import UserActionMiddleware
 
 logging.basicConfig(level=logging.INFO)
 
@@ -25,6 +27,10 @@ WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
+# Подключаем middleware на Message и CallbackQuery
+dp.message.middleware(UserActionMiddleware())
+dp.callback_query.middleware(UserActionMiddleware())
+
 for router in [
     start_router,
     repair_type_router,
@@ -32,6 +38,7 @@ for router in [
     rates_router,
     project_router,
     subscribe_router,
+    payment_router,
     voice_router,
 ]:
     dp.include_router(router)
@@ -55,7 +62,10 @@ async def main() -> None:
         logging.warning("Port %s is busy, using port %s instead", WEBHOOK_PORT, port)
 
     app = web.Application()
+    app["bot"] = bot
     app.router.add_get("/health", healthcheck)
+    app.router.add_post("/tribute/webhook", tribute_webhook_handler)
+
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
