@@ -1,11 +1,12 @@
 from aiogram import Router, F
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from utils.storage import ensure_user, get_user_projects, get_user_summary, reset_user_month
 from utils.subscription import get_plan_limits, get_plan_name, is_paid_active
 from utils.keyboards import main_menu_kb
+from utils.tribute import get_tribute_pay_url
 
 router = Router()
 
@@ -28,6 +29,34 @@ def _menu_text(user: dict) -> str:
         "📂 <b>Проекты</b> — карточки объектов с историей смет\n"
         "💸 <b>Расценки</b> — твои ставки на работы (бот их учитывает)\n"
         "💳 <b>Подписка</b> — free / paid-план"
+    )
+
+
+def _subscribe_kb(user: dict) -> InlineKeyboardMarkup:
+    active = is_paid_active(user)
+    if active:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="nav:menu")],
+        ])
+    pay_url = get_tribute_pay_url(user["id"])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 Оплатить Paid-план", url=pay_url)],
+        [InlineKeyboardButton(text="◀️ Главное меню", callback_data="nav:menu")],
+    ])
+
+
+def _subscribe_text(user: dict) -> str:
+    active = is_paid_active(user)
+    plan = get_plan_name(user)
+    plan_icon = "💳" if active else "🆓"
+    return (
+        f"💳 <b>Подписка</b>\n\n"
+        f"{plan_icon} Текущий план: <b>{plan}</b>\n"
+        f"Статус: <b>{'активна' if active else 'не активна'}</b>\n"
+        f"Оплачено до: <b>{user.get('paid_until') or '—'}</b>\n\n"
+        "🆓 <b>Free</b> — 1 проект в месяц, только вариант «Эконом» целиком\n"
+        "💳 <b>Paid</b> — безлимит проектов, все 3 варианта с детализацией, выгрузка PDF\n\n"
+        "После оплаты вернись в бот и напиши /paid"
     )
 
 
@@ -76,21 +105,8 @@ async def cb_nav_status(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "nav:subscribe")
 async def cb_nav_subscribe(call: CallbackQuery) -> None:
-    from utils.keyboards import back_kb
-    from utils.subscription import is_paid_active, get_plan_name
     user = ensure_user(call.from_user)
-    active = is_paid_active(user)
-    plan = get_plan_name(user)
-    plan_icon = "💳" if active else "🆓"
-    await call.message.answer(
-        f"💳 <b>Подписка</b>\n\n"
-        f"{plan_icon} Текущий план: <b>{plan}</b>\n"
-        f"Статус: <b>{'активна' if active else 'не активна'}</b>\n"
-        f"Оплачено до: <b>{user.get('paid_until') or '—'}</b>\n\n"
-        "🆓 <b>Free</b> — 1 проект в месяц, только вариант «Эконом» целиком\n"
-        "💳 <b>Paid</b> — безлимит проектов, все 3 варианта с детализацией, выгрузка PDF",
-        reply_markup=back_kb(),
-    )
+    await call.message.answer(_subscribe_text(user), reply_markup=_subscribe_kb(user))
     await call.answer()
 
 
