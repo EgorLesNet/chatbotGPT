@@ -4,8 +4,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import json
 
-from db.models import UserRole, User
+from db.models import UserRole, User, TaskReport
 from db.repo import (
     get_sites_by_foreman, create_task, get_tasks_by_site,
     get_task_by_id, get_site_by_id, get_site_worker_telegram_ids
@@ -37,11 +38,85 @@ async def foreman_tasks_menu(message: Message, session: AsyncSession, current_us
 async def foreman_tasks_list(callback: CallbackQuery, session: AsyncSession):
     site_id = int(callback.data.split(":")[1])
     tasks = await get_tasks_by_site(session, site_id)
-    if not tasks:
-        await callback.message.edit_text("На этом объекте нет задач.")
-        await callback.answer()
+    active = [t for t in tasks if t.status.value != "done"]
+    done_count = len([t for t in tasks if t.status.value == "done"])
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    kb = kb_tasks_inline(active) if active else None
+
+    archive_btn = InlineKeyboardButton(text=f"📦 Архив ({done_count})", callback_data=f"f_archive:{site_id}")
+    if kb:
+        kb.inline_keyboard.append([archive_btn])
+    else:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[archive_btn]])
+
+    text = "📋 Активные задачи:" if active else "Активных задач нет."
+    await callback.message.edit_text(text, reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("f_archive:"))
+async def foreman_archive_list(callback: CallbackQuery, session: AsyncSession):
+    site_id = int(callback.data.split(":")[1])
+    tasks = await get_tasks_by_site(session, site_id)
+    done_tasks = [t for t in tasks if t.status.value == "done"]
+
+    if not done_tasks:
+        await callback.answer("Выполненных задач пока нет.", show_alert=True)
         return
-    await callback.message.edit_text("📋 Задачи объекта:", reply_markup=kb_tasks_inline(tasks))
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = [
+        [InlineKeyboardButton(text=f"🟢 {t.title}", callback_data=f"f_arch_task:{t.id}")]
+        for t in done_tasks
+    ]
+    buttons.append([InlineKeyboardButton(text="← Назад", callback_data=f"f_tasks:{site_id}")])
+    await callback.message.edit_text(
+        "📦 <b>Архив выполненных задач:</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("f_arch_task:"))
+async def foreman_archive_task_detail(callback: CallbackQuery, session: AsyncSession, bot: Bot):
+    task_id = int(callback.data.split(":")[1])
+    task = await get_task_by_id(session, task_id)
+    if not task:
+        await callback.answer("Задача не найдена.", show_alert=True)
+        return
+
+    # Исполнитель
+    worker_name = "неизвестно"
+    if task.taken_by_id:
+        res = await session.execute(select(User).where(User.id == task.taken_by_id))
+        w = res.scalar_one_or_none()
+        if w:
+            worker_name = w.name
+
+    # Отчёт
+    res = await session.execute(select(TaskReport).where(TaskReport.task_id == task_id))
+    report = res.scalar_one_or_none()
+
+    text = (
+        f"🟢 <b>{task.title}</b>\n"
+        f"📝 {task.description or '—'}\n"
+        f"👷 Исполнитель: {worker_name}\n"
+    )
+    if report:
+        text += f"💬 Комментарий: {report.comment or '—'}\n"
+
+    await callback.message.answer(text)
+
+    # Фото из отчёта
+    if report and report.photos_json:
+        photos = json.loads(report.photos_json)
+        for ph in photos:
+            try:
+                await bot.send_photo(callback.from_user.id, ph)
+            except Exception:
+                pass
+
     await callback.answer()
 
 
@@ -90,7 +165,7 @@ async def foreman_pick_site(callback: CallbackQuery, state: FSMContext):
 @router.message(TaskCreateState.title)
 async def foreman_task_title(message: Message, state: FSMContext):
     await state.update_data(title=message.text.strip())
-    await message.answer("Опишите задачу подробнее (или отправьте ‘-’ чтобы пропустить):")
+    await message.answer("Опишите задачу подробнее (или отправьте '-' чтобы пропустить):")
     await state.set_state(TaskCreateState.description)
 
 
