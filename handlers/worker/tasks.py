@@ -10,13 +10,10 @@ from db.repo import (
     get_sites_for_worker, get_tasks_by_site,
     get_task_by_id, take_task, complete_task, create_report, get_site_by_id
 )
-from filters.role import RoleFilter
 from keyboards.worker import kb_worker_main, kb_sites_inline, kb_tasks_inline, kb_task_worker
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(RoleFilter(UserRole.worker))
-router.callback_query.filter(RoleFilter(UserRole.worker))
 
 
 class ReportState(StatesGroup):
@@ -24,8 +21,10 @@ class ReportState(StatesGroup):
     comment = State()
 
 
-@router.message(F.text == "📋 Задачи")
+@router.message(F.text == "📋 Мои задачи")
 async def worker_tasks_menu(message: Message, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.worker:
+        return
     sites = await get_sites_for_worker(session, current_user.id)
     if not sites:
         await message.answer("Вы не состоите ни в одном объекте.", reply_markup=kb_worker_main())

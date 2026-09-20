@@ -9,21 +9,20 @@ from db.repo import (
     get_sites_for_worker, get_site_by_id,
     save_message, get_recent_messages, get_all_site_participant_telegram_ids
 )
-from filters.role import RoleFilter
 from keyboards.worker import kb_worker_main, kb_sites_inline
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(RoleFilter(UserRole.worker))
-router.callback_query.filter(RoleFilter(UserRole.worker))
 
 
 class WorkerChatState(StatesGroup):
     chatting = State()
 
 
-@router.message(F.text == "💬 Чат")
+@router.message(F.text == "💬 Чат рабочего")
 async def worker_chat_menu(message: Message, state: FSMContext, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.worker:
+        return
     sites = await get_sites_for_worker(session, current_user.id)
     if not sites:
         await message.answer("Вы не состоите ни в одном объекте.", reply_markup=kb_worker_main())

@@ -9,13 +9,10 @@ from db.repo import (
     get_sites_by_foreman, get_site_by_id,
     save_message, get_recent_messages, get_all_site_participant_telegram_ids
 )
-from filters.role import RoleFilter
 from keyboards.foreman import kb_foreman_main, kb_sites_inline
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(RoleFilter(UserRole.foreman))
-router.callback_query.filter(RoleFilter(UserRole.foreman))
 
 
 class ForemanChatState(StatesGroup):
@@ -24,15 +21,20 @@ class ForemanChatState(StatesGroup):
 
 @router.message(F.text == "💬 Чат")
 async def chat_menu(message: Message, state: FSMContext, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        return
     sites = await get_sites_by_foreman(session, current_user.id)
     if not sites:
-        await message.answer("Сначала создайте объект.", reply_markup=kb_foreman_main())
+        await message.answer("Сначама создайте объект.", reply_markup=kb_foreman_main())
         return
     await message.answer("Выберите объект для чата:", reply_markup=kb_sites_inline(sites, action="f_chat"))
 
 
 @router.callback_query(F.data.startswith("f_chat:"))
 async def enter_chat(callback: CallbackQuery, state: FSMContext, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        await callback.answer()
+        return
     site_id = int(callback.data.split(":")[1])
     await state.update_data(chat_site_id=site_id)
     await state.set_state(ForemanChatState.chatting)

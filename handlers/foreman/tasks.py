@@ -10,13 +10,10 @@ from db.repo import (
     get_sites_by_foreman, create_task, get_tasks_by_site,
     get_task_by_id, get_site_by_id, get_site_worker_telegram_ids
 )
-from filters.role import RoleFilter
 from keyboards.foreman import kb_foreman_main, kb_sites_inline, kb_tasks_inline, kb_task_foreman
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(RoleFilter(UserRole.foreman))
-router.callback_query.filter(RoleFilter(UserRole.foreman))
 
 
 class TaskCreateState(StatesGroup):
@@ -27,6 +24,8 @@ class TaskCreateState(StatesGroup):
 
 @router.message(F.text == "📋 Задачи")
 async def foreman_tasks_menu(message: Message, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        return
     sites = await get_sites_by_foreman(session, current_user.id)
     if not sites:
         await message.answer("Сначала создайте объект.", reply_markup=kb_foreman_main())
@@ -69,6 +68,8 @@ async def foreman_task_detail(callback: CallbackQuery, session: AsyncSession):
 
 @router.message(F.text == "➕ Создать задачу")
 async def foreman_create_task_start(message: Message, state: FSMContext, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        return
     sites = await get_sites_by_foreman(session, current_user.id)
     if not sites:
         await message.answer("Сначала создайте объект.", reply_markup=kb_foreman_main())

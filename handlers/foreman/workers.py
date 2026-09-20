@@ -6,13 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserRole
 from db.repo import get_sites_by_foreman, get_user_by_phone, is_member, add_member
-from filters.role import RoleFilter
 from keyboards.foreman import kb_foreman_main, kb_sites_inline
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(RoleFilter(UserRole.foreman))
-router.callback_query.filter(RoleFilter(UserRole.foreman))
 
 
 class AddWorkerState(StatesGroup):
@@ -22,6 +19,8 @@ class AddWorkerState(StatesGroup):
 
 @router.message(F.text == "👷 Рабочие")
 async def foreman_workers_menu(message: Message, state: FSMContext, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        return
     sites = await get_sites_by_foreman(session, current_user.id)
     if not sites:
         await message.answer("Сначала создайте объект.", reply_markup=kb_foreman_main())

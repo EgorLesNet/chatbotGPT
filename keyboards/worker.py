@@ -5,8 +5,8 @@ from db.models import Site, Task
 def kb_worker_main() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🏗 Мои объекты"), KeyboardButton(text="📋 Задачи")],
-            [KeyboardButton(text="💬 Чат")],
+            [KeyboardButton(text="🏗 Мои объекты"), KeyboardButton(text="📋 Мои задачи")],
+            [KeyboardButton(text="💬 Чат рабочего")],
         ],
         resize_keyboard=True,
     )

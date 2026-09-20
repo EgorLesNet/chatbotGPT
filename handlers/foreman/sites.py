@@ -6,14 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserRole
 from db.repo import get_sites_by_foreman, create_site
-from filters.role import RoleFilter
 from keyboards.foreman import kb_foreman_main, kb_sites_inline
 from keyboards.common import kb_remove
 from utils.invite import generate_invite_code
 
 router = Router()
-router.message.filter(RoleFilter(UserRole.foreman))
-router.callback_query.filter(RoleFilter(UserRole.foreman))
 
 
 class SiteCreateState(StatesGroup):
@@ -23,6 +20,8 @@ class SiteCreateState(StatesGroup):
 
 @router.message(F.text == "🏗 Мои объекты")
 async def foreman_my_sites(message: Message, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        return
     sites = await get_sites_by_foreman(session, current_user.id)
     if not sites:
         await message.answer("У вас пока нет объектов. Нажмите ‘➕ Создать объект’.", reply_markup=kb_foreman_main())
@@ -32,6 +31,8 @@ async def foreman_my_sites(message: Message, session: AsyncSession, current_user
 
 @router.callback_query(F.data.startswith("f_site:"))
 async def foreman_site_detail(callback: CallbackQuery, session: AsyncSession, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        return
     site_id = int(callback.data.split(":")[1])
     from db.repo import get_site_by_id
     site = await get_site_by_id(session, site_id)
@@ -52,7 +53,9 @@ async def foreman_site_detail(callback: CallbackQuery, session: AsyncSession, cu
 
 
 @router.message(F.text == "➕ Создать объект")
-async def foreman_create_site_start(message: Message, state: FSMContext):
+async def foreman_create_site_start(message: Message, state: FSMContext, current_user):
+    if not current_user or current_user.role != UserRole.foreman:
+        return
     await message.answer("Введите название объекта:", reply_markup=kb_remove())
     await state.set_state(SiteCreateState.name)
 
