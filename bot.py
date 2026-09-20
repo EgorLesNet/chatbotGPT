@@ -1,73 +1,50 @@
 import asyncio
 import logging
 import os
-import socket
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiohttp import web
+from dotenv import load_dotenv
 
-from handlers.repair_type import router as repair_type_router
-from handlers.estimate import router as estimate_router
-from handlers.project import router as project_router
-from handlers.rates import router as rates_router
-from handlers.start import router as start_router
-from handlers.subscribe import router as subscribe_router
-from handlers.voice import router as voice_router
-from handlers.payment import router as payment_router
-from utils.log_middleware import UserActionMiddleware
+from db.base import init_db
+from handlers.auth import router as auth_router
+from handlers.foreman.sites import router as f_sites_router
+from handlers.foreman.tasks import router as f_tasks_router
+from handlers.foreman.workers import router as f_workers_router
+from handlers.foreman.chat import router as f_chat_router
+from handlers.worker.sites import router as w_sites_router
+from handlers.worker.tasks import router as w_tasks_router
+from handlers.worker.chat import router as w_chat_router
+from middlewares.auth import AuthMiddleware
 
+load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
 
-bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher(storage=MemoryStorage())
+async def main():
+    await init_db()
 
-dp.message.middleware(UserActionMiddleware())
-dp.callback_query.middleware(UserActionMiddleware())
+    bot = Bot(
+        token=os.getenv("BOT_TOKEN", ""),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    dp = Dispatcher(storage=MemoryStorage())
+    dp.message.middleware(AuthMiddleware())
+    dp.callback_query.middleware(AuthMiddleware())
 
-for router in [
-    start_router,
-    repair_type_router,
-    estimate_router,
-    rates_router,
-    project_router,
-    subscribe_router,
-    payment_router,
-    voice_router,
-]:
-    dp.include_router(router)
+    dp.include_routers(
+        auth_router,
+        f_sites_router,
+        f_tasks_router,
+        f_workers_router,
+        f_chat_router,
+        w_sites_router,
+        w_tasks_router,
+        w_chat_router,
+    )
 
-
-def find_free_port(start_port: int, max_attempts: int = 10) -> int:
-    for port in range(start_port, start_port + max_attempts):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("0.0.0.0", port)) != 0:
-                return port
-    raise OSError(f"No free port found in range {start_port}–{start_port + max_attempts}")
-
-
-async def healthcheck(_: web.Request) -> web.Response:
-    return web.json_response({"status": "ok"})
-
-
-async def main() -> None:
-    port = find_free_port(WEBHOOK_PORT)
-    if port != WEBHOOK_PORT:
-        logging.warning("Port %s is busy, using port %s instead", WEBHOOK_PORT, port)
-
-    app = web.Application()
-    app.router.add_get("/health", healthcheck)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logging.info("Healthcheck server listening on port %s", port)
-    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 
