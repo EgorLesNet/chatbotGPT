@@ -7,12 +7,11 @@ from db.repo import get_sites_for_worker
 from keyboards.worker import kb_worker_main, kb_sites_inline
 
 router = Router()
+router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
 
 
 @router.message(F.text == "🏗 Мои объекты")
 async def worker_my_sites(message: Message, session: AsyncSession, current_user):
-    if not current_user or current_user.role != UserRole.worker:
-        return
     sites = await get_sites_for_worker(session, current_user.id)
     if not sites:
         await message.answer(

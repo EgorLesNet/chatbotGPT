@@ -13,6 +13,8 @@ from keyboards.worker import kb_worker_main, kb_sites_inline
 from keyboards.common import kb_remove
 
 router = Router()
+router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
+router.callback_query.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
 
 
 class WorkerChatState(StatesGroup):
@@ -21,8 +23,6 @@ class WorkerChatState(StatesGroup):
 
 @router.message(F.text == "💬 Чат")
 async def worker_chat_menu(message: Message, state: FSMContext, session: AsyncSession, current_user):
-    if not current_user or current_user.role != UserRole.worker:
-        return
     sites = await get_sites_for_worker(session, current_user.id)
     if not sites:
         await message.answer("Вы не состоите ни в одном объекте.", reply_markup=kb_worker_main())

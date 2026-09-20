@@ -14,6 +14,8 @@ from keyboards.worker import kb_worker_main, kb_sites_inline, kb_tasks_inline, k
 from keyboards.common import kb_remove
 
 router = Router()
+router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
+router.callback_query.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
 
 
 class ReportState(StatesGroup):
@@ -24,8 +26,6 @@ class ReportState(StatesGroup):
 
 @router.message(F.text == "📋 Задачи")
 async def worker_tasks_menu(message: Message, session: AsyncSession, current_user):
-    if not current_user or current_user.role != UserRole.worker:
-        return
     sites = await get_sites_for_worker(session, current_user.id)
     if not sites:
         await message.answer("Вы не состоите ни в одном объекте.", reply_markup=kb_worker_main())
@@ -72,7 +72,6 @@ async def worker_take_task(callback: CallbackQuery, session: AsyncSession, curre
         await callback.answer("Задача уже занята или не найдена.", show_alert=True)
         return
     await take_task(session, task_id, current_user.id)
-    # Уведомить прораба
     site = await get_site_by_id(session, task.site_id)
     if site:
         res = await session.execute(select(User).where(User.id == site.foreman_id))
@@ -143,7 +142,6 @@ async def save_report(message: Message, state: FSMContext, session: AsyncSession
         reply_markup=kb_worker_main(),
     )
 
-    # Уведомить прораба с фото
     if site:
         res = await session.execute(select(User).where(User.id == site.foreman_id))
         foreman = res.scalar_one_or_none()

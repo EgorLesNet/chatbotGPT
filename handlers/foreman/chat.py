@@ -1,4 +1,5 @@
 from aiogram import Router, F, Bot
+from aiogram.filters import Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery
@@ -13,6 +14,8 @@ from keyboards.foreman import kb_foreman_main, kb_sites_inline
 from keyboards.common import kb_remove
 
 router = Router()
+router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.foreman))
+router.callback_query.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.foreman))
 
 
 class ForemanChatState(StatesGroup):
@@ -22,8 +25,6 @@ class ForemanChatState(StatesGroup):
 
 @router.message(F.text == "💬 Чат")
 async def chat_menu(message: Message, state: FSMContext, session: AsyncSession, current_user):
-    if not current_user or current_user.role != UserRole.foreman:
-        return
     sites = await get_sites_by_foreman(session, current_user.id)
     if not sites:
         await message.answer("Сначала создайте объект.", reply_markup=kb_foreman_main())
