@@ -1,16 +1,18 @@
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserRole
 from db.repo import get_sites_by_foreman, get_user_by_phone, is_member, add_member
+from filters.role import RoleFilter
 from keyboards.foreman import kb_foreman_main, kb_sites_inline
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.foreman))
+router.message.filter(RoleFilter(UserRole.foreman))
+router.callback_query.filter(RoleFilter(UserRole.foreman))
 
 
 class AddWorkerState(StatesGroup):
@@ -19,18 +21,12 @@ class AddWorkerState(StatesGroup):
 
 
 @router.message(F.text == "👷 Рабочие")
-async def foreman_workers_menu(message: Message, session: AsyncSession, current_user):
+async def foreman_workers_menu(message: Message, state: FSMContext, session: AsyncSession, current_user):
     sites = await get_sites_by_foreman(session, current_user.id)
     if not sites:
         await message.answer("Сначала создайте объект.", reply_markup=kb_foreman_main())
         return
-    await message.answer("Введите номер телефона рабочего (7XXXXXXXXXX):", reply_markup=kb_remove())
-    await message.bot
-    await message.answer("Отправьте номер телефона рабочего:")
-    await message.answer("📱 Введите номер телефона рабочего:")
-    await message.answer("Введите номер телефона рабочего:", reply_markup=kb_remove())
-    await message.answer("📱 Номер рабочего:")
-    await message.answer("Введите номер телефона рабочего (7XXXXXXXXXX):", reply_markup=kb_remove())
+    await message.answer("📱 Введите номер телефона рабочего (7XXXXXXXXXX):", reply_markup=kb_remove())
     await state.set_state(AddWorkerState.phone)
 
 
@@ -48,7 +44,7 @@ async def foreman_worker_phone(message: Message, state: FSMContext, session: Asy
 
 
 @router.callback_query(F.data.startswith("f_addworker:"), AddWorkerState.site)
-async def foreman_add_worker_site(callback, state: FSMContext, session: AsyncSession):
+async def foreman_add_worker_site(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     site_id = int(callback.data.split(":")[1])
     data = await state.get_data()
     await state.clear()

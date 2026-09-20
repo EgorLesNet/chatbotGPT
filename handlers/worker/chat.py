@@ -9,12 +9,13 @@ from db.repo import (
     get_sites_for_worker, get_site_by_id,
     save_message, get_recent_messages, get_all_site_participant_telegram_ids
 )
+from filters.role import RoleFilter
 from keyboards.worker import kb_worker_main, kb_sites_inline
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
-router.callback_query.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
+router.message.filter(RoleFilter(UserRole.worker))
+router.callback_query.filter(RoleFilter(UserRole.worker))
 
 
 class WorkerChatState(StatesGroup):
@@ -30,7 +31,7 @@ async def worker_chat_menu(message: Message, state: FSMContext, session: AsyncSe
     if len(sites) == 1:
         await _enter_chat(message, state, session, current_user, sites[0].id)
     else:
-        await message.answer("Выберите объект для чата:", reply_markup=kb_sites_inline(sites, action="w_chat"))
+        await message.answer("Выберите объект:", reply_markup=kb_sites_inline(sites, action="w_chat"))
 
 
 @router.callback_query(F.data.startswith("w_chat:"))
@@ -52,7 +53,7 @@ async def _enter_chat(message: Message, state: FSMContext, session, current_user
     await message.answer(
         f"💬 Чат объекта <b>{site.name}</b>\n\n"
         + (history if history else "(Сообщений пока нет)\n") +
-        "\nПишите — сообщение получат все участники.\n/start — выйти из чата.",
+        "\nПишите — все участники получат.\n/start — выйти.",
         reply_markup=kb_remove(),
     )
 

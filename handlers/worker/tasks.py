@@ -10,16 +10,16 @@ from db.repo import (
     get_sites_for_worker, get_tasks_by_site,
     get_task_by_id, take_task, complete_task, create_report, get_site_by_id
 )
+from filters.role import RoleFilter
 from keyboards.worker import kb_worker_main, kb_sites_inline, kb_tasks_inline, kb_task_worker
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
-router.callback_query.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
+router.message.filter(RoleFilter(UserRole.worker))
+router.callback_query.filter(RoleFilter(UserRole.worker))
 
 
 class ReportState(StatesGroup):
-    task_id = State()
     photos = State()
     comment = State()
 
@@ -85,7 +85,7 @@ async def worker_take_task(callback: CallbackQuery, session: AsyncSession, curre
             except Exception:
                 pass
     await callback.message.edit_text(
-        f"✅ Вы взяли задачу <b>{task.title}</b>. Выполняйте и отметьте результат.",
+        f"✅ Вы взяли задачу <b>{task.title}</b>.",
         reply_markup=kb_task_worker(task_id, "in_progress"),
     )
     await callback.answer()
@@ -96,8 +96,7 @@ async def worker_done_start(callback: CallbackQuery, state: FSMContext):
     task_id = int(callback.data.split(":")[1])
     await state.update_data(task_id=task_id, photos=[])
     await callback.message.answer(
-        "📸 Отправьте фото выполненной работы (1–5 фото).\n"
-        "Когда закончите — напишите <b>готово</b>.",
+        "📸 Отправьте фото выполненной работы (1–5 фото).\nКогда закончите — напишите <b>готово</b>.",
         reply_markup=kb_remove(),
     )
     await state.set_state(ReportState.photos)
@@ -110,7 +109,7 @@ async def collect_photo(message: Message, state: FSMContext):
     photos: list = data.get("photos", [])
     photos.append(message.photo[-1].file_id)
     await state.update_data(photos=photos)
-    await message.answer(f"📸 Фото {len(photos)} получено. Ещё фото или напишите <b>готово</b>.")
+    await message.answer(f"📸 Фото {len(photos)} получено.")
 
 
 @router.message(ReportState.photos, F.text.lower() == "готово")
@@ -119,7 +118,7 @@ async def photos_done(message: Message, state: FSMContext):
     if not data.get("photos"):
         await message.answer("Нужно хотя бы одно фото.")
         return
-    await message.answer("Напишите краткий комментарий к выполненной работе:")
+    await message.answer("Напишите комментарий:")
     await state.set_state(ReportState.comment)
 
 
@@ -130,18 +129,11 @@ async def save_report(message: Message, state: FSMContext, session: AsyncSession
     task_id = data["task_id"]
     photos = data.get("photos", [])
     comment = (message.text or "").strip()
-
     await create_report(session, task_id, current_user.id, comment, photos)
     await complete_task(session, task_id)
-
     task = await get_task_by_id(session, task_id)
     site = await get_site_by_id(session, task.site_id) if task else None
-
-    await message.answer(
-        "✅ Отчёт отправлен! Задача отмечена выполненной.",
-        reply_markup=kb_worker_main(),
-    )
-
+    await message.answer("✅ Отчёт отправлен! Задача выполнена.", reply_markup=kb_worker_main())
     if site:
         res = await session.execute(select(User).where(User.id == site.foreman_id))
         foreman = res.scalar_one_or_none()
@@ -149,8 +141,7 @@ async def save_report(message: Message, state: FSMContext, session: AsyncSession
             try:
                 text = (
                     f"🟢 <b>{current_user.name}</b> выполнил задачу <b>{task.title}</b>\n"
-                    f"Объект: {site.name}\n"
-                    f"Комментарий: {comment}"
+                    f"Объект: {site.name}\nКомментарий: {comment}"
                 )
                 if photos:
                     await bot.send_photo(foreman.telegram_id, photos[0], caption=text)

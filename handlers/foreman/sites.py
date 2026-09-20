@@ -6,13 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserRole
 from db.repo import get_sites_by_foreman, create_site
+from filters.role import RoleFilter
 from keyboards.foreman import kb_foreman_main, kb_sites_inline
 from keyboards.common import kb_remove
 from utils.invite import generate_invite_code
 
 router = Router()
-router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.foreman))
-router.callback_query.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.foreman))
+router.message.filter(RoleFilter(UserRole.foreman))
+router.callback_query.filter(RoleFilter(UserRole.foreman))
 
 
 class SiteCreateState(StatesGroup):

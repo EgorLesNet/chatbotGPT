@@ -10,12 +10,13 @@ from db.repo import (
     get_sites_by_foreman, create_task, get_tasks_by_site,
     get_task_by_id, get_site_by_id, get_site_worker_telegram_ids
 )
+from filters.role import RoleFilter
 from keyboards.foreman import kb_foreman_main, kb_sites_inline, kb_tasks_inline, kb_task_foreman
 from keyboards.common import kb_remove
 
 router = Router()
-router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.foreman))
-router.callback_query.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.foreman))
+router.message.filter(RoleFilter(UserRole.foreman))
+router.callback_query.filter(RoleFilter(UserRole.foreman))
 
 
 class TaskCreateState(StatesGroup):
@@ -38,7 +39,7 @@ async def foreman_tasks_list(callback: CallbackQuery, session: AsyncSession):
     site_id = int(callback.data.split(":")[1])
     tasks = await get_tasks_by_site(session, site_id)
     if not tasks:
-        await callback.message.edit_text("На этом объекте нет задач. Нажмите ‘➕ Создать задачу’.")
+        await callback.message.edit_text("На этом объекте нет задач.")
         await callback.answer()
         return
     await callback.message.edit_text("📋 Задачи объекта:", reply_markup=kb_tasks_inline(tasks))
@@ -98,8 +99,6 @@ async def foreman_task_desc(message: Message, state: FSMContext, session: AsyncS
     await state.clear()
     desc = message.text.strip() if message.text and message.text.strip() != "-" else ""
     task = await create_task(session, data["site_id"], data["title"], desc, current_user.id)
-
-    # Уведомить всех рабочих объекта
     worker_tg_ids = await get_site_worker_telegram_ids(session, data["site_id"])
     site = await get_site_by_id(session, data["site_id"])
     for tg_id in worker_tg_ids:
@@ -111,8 +110,4 @@ async def foreman_task_desc(message: Message, state: FSMContext, session: AsyncS
             )
         except Exception:
             pass
-
-    await message.answer(
-        f"✅ Задача <b>{task.title}</b> создана!",
-        reply_markup=kb_foreman_main(),
-    )
+    await message.answer(f"✅ Задача <b>{task.title}</b> создана!", reply_markup=kb_foreman_main())

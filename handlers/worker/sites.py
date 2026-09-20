@@ -4,10 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserRole
 from db.repo import get_sites_for_worker
+from filters.role import RoleFilter
 from keyboards.worker import kb_worker_main, kb_sites_inline
 
 router = Router()
-router.message.filter(F.func(lambda _, d: d.get("current_user") and d["current_user"].role == UserRole.worker))
+router.message.filter(RoleFilter(UserRole.worker))
 
 
 @router.message(F.text == "🏗 Мои объекты")
