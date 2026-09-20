@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from sqlalchemy import (
     BigInteger, String, Text, DateTime, ForeignKey,
-    Enum as SAEnum, Integer, Boolean
+    Enum as SAEnum, Integer
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.base import Base
@@ -32,7 +32,14 @@ class User(Base):
 
     sites_as_foreman: Mapped[list["Site"]] = relationship(back_populates="foreman")
     memberships: Mapped[list["SiteMember"]] = relationship(back_populates="worker")
-    tasks_created: Mapped[list["Task"]] = relationship(back_populates="created_by_user")
+    tasks_created: Mapped[list["Task"]] = relationship(
+        back_populates="created_by_user",
+        foreign_keys="Task.created_by",
+    )
+    tasks_taken: Mapped[list["Task"]] = relationship(
+        back_populates="taken_by_user",
+        foreign_keys="Task.taken_by_id",
+    )
     reports: Mapped[list["TaskReport"]] = relationship(back_populates="worker")
     messages: Mapped[list["Message"]] = relationship(back_populates="sender")
 
@@ -78,8 +85,14 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     site: Mapped["Site"] = relationship(back_populates="tasks")
-    created_by_user: Mapped["User"] = relationship(foreign_keys=[created_by], back_populates="tasks_created")
-    taken_by_user: Mapped["User | None"] = relationship(foreign_keys=[taken_by_id])
+    created_by_user: Mapped["User"] = relationship(
+        foreign_keys=[created_by],
+        back_populates="tasks_created",
+    )
+    taken_by_user: Mapped["User | None"] = relationship(
+        foreign_keys=[taken_by_id],
+        back_populates="tasks_taken",
+    )
     reports: Mapped[list["TaskReport"]] = relationship(back_populates="task")
 
 
