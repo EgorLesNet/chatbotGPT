@@ -1,133 +1,94 @@
-from aiogram import Router, F, Bot
-from aiogram.filters import CommandStart
+from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, Contact
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserRole
-from db.repo import (
-    get_user_by_telegram_id, create_user,
-    get_site_by_invite_code, is_member, add_member, get_user_by_phone
-)
+from db.repo import get_user_by_phone, create_user, set_user_lang
 from keyboards.common import kb_phone, kb_role, kb_remove
 from keyboards.foreman import kb_foreman_main
 from keyboards.worker import kb_worker_main
+from keyboards.lang import kb_lang
+from locales.i18n import t, LANGUAGES
 
 router = Router()
 
 
 class RegState(StatesGroup):
-    waiting_phone = State()
-    waiting_role = State()
-    waiting_name = State()
+    lang = State()
+    phone = State()
+    name = State()
+    role = State()
 
 
-@router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, current_user, bot: Bot):
-    args = message.text.split(maxsplit=1)[1] if message.text and len(message.text.split()) > 1 else ""
-    invite_code = args.strip() if args else ""
-
+@router.message(F.text == "/start")
+async def cmd_start(message: Message, state: FSMContext, current_user, lang: str):
     if current_user:
-        # Уже зарегистрирован — обработать инвайт если есть
-        if invite_code:
-            await _handle_invite(message, session, current_user, invite_code, bot)
+        if current_user.role == UserRole.foreman:
+            await message.answer(t("welcome_back", lang, name=current_user.name), reply_markup=kb_foreman_main(lang))
         else:
-            await _show_main(message, current_user)
+            await message.answer(t("welcome_back", lang, name=current_user.name), reply_markup=kb_worker_main(lang))
         return
-
-    await state.update_data(invite_code=invite_code)
-    await message.answer(
-        "👋 Добро пожаловать на платформу <b>Прораб</b>!\n\nПоделитесь номером телефона для регистрации:",
-        reply_markup=kb_phone(),
-    )
-    await state.set_state(RegState.waiting_phone)
+    await state.set_state(RegState.lang)
+    await message.answer(t("choose_language", "ru"), reply_markup=kb_lang())
 
 
-@router.message(RegState.waiting_phone, F.contact)
+@router.callback_query(F.data.startswith("set_lang:"), RegState.lang)
+async def pick_lang(callback: CallbackQuery, state: FSMContext):
+    lang = callback.data.split(":")[1]
+    if lang not in LANGUAGES:
+        await callback.answer()
+        return
+    await state.update_data(lang=lang)
+    await callback.message.edit_text(t("welcome", lang))
+    await callback.message.answer(t("welcome", lang), reply_markup=kb_phone(lang))
+    await state.set_state(RegState.phone)
+    await callback.answer()
+
+
+@router.message(RegState.phone, F.contact)
 async def reg_phone(message: Message, state: FSMContext, session: AsyncSession):
-    contact: Contact = message.contact
-    phone = contact.phone_number.replace("+", "").strip()
+    data = await state.get_data()
+    lang = data.get("lang", "ru")
+    phone = message.contact.phone_number.lstrip("+")
     existing = await get_user_by_phone(session, phone)
     if existing:
-        await message.answer("⚠️ Этот номер уже зарегистрирован.", reply_markup=kb_remove())
+        await message.answer(t("phone_already_registered", lang), reply_markup=kb_remove())
         await state.clear()
         return
     await state.update_data(phone=phone)
-    await message.answer("Как вас зовут? (имя и фамилия)", reply_markup=kb_remove())
-    await state.set_state(RegState.waiting_name)
+    await message.answer(t("enter_name", lang), reply_markup=kb_remove())
+    await state.set_state(RegState.name)
 
 
-@router.message(RegState.waiting_name)
+@router.message(RegState.name)
 async def reg_name(message: Message, state: FSMContext):
-    name = (message.text or "").strip()
-    if not name:
-        await message.answer("Введите имя:")
-        return
-    await state.update_data(name=name)
-    await message.answer("Выберите вашу роль:", reply_markup=kb_role())
-    await state.set_state(RegState.waiting_role)
-
-
-@router.message(RegState.waiting_role, F.text.in_(["👷 Я прораб", "🔨 Я рабочий"]))
-async def reg_role(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
-    role = UserRole.foreman if "прораб" in message.text else UserRole.worker
     data = await state.get_data()
-    user = await create_user(
-        session,
-        telegram_id=message.from_user.id,
-        phone=data["phone"],
-        name=data["name"],
-        role=role,
-    )
+    lang = data.get("lang", "ru")
+    await state.update_data(name=message.text.strip())
+    await message.answer(t("choose_role", lang), reply_markup=kb_role(lang))
+    await state.set_state(RegState.role)
+
+
+@router.message(RegState.role)
+async def reg_role(message: Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    lang = data.get("lang", "ru")
+    text = message.text.strip()
+    role_map = {
+        t("role_foreman", l): UserRole.foreman for l in ("ru", "en", "tg", "uz")
+    }
+    role_map.update({
+        t("role_worker", l): UserRole.worker for l in ("ru", "en", "tg", "uz")
+    })
+    role = role_map.get(text)
+    if not role:
+        await message.answer(t("choose_role", lang), reply_markup=kb_role(lang))
+        return
+    user = await create_user(session, message.from_user.id, data["phone"], data["name"], role, lang)
     await state.clear()
-
-    invite_code = data.get("invite_code", "")
-    if invite_code:
-        await _handle_invite(message, session, user, invite_code, bot)
+    if role == UserRole.foreman:
+        await message.answer(t("reg_done", lang, name=user.name), reply_markup=kb_foreman_main(lang))
     else:
-        await message.answer(
-            f"✅ Регистрация завершена! Добро пожаловать, <b>{user.name}</b>!",
-            reply_markup=kb_foreman_main() if role == UserRole.foreman else kb_worker_main(),
-        )
-
-
-async def _handle_invite(message: Message, session, user, invite_code: str, bot: Bot):
-    site = await get_site_by_invite_code(session, invite_code)
-    if not site:
-        await message.answer("❌ Неверный инвайт-код.", reply_markup=kb_worker_main())
-        return
-    if await is_member(session, site.id, user.id):
-        await message.answer(
-            f"ℹ️ Вы уже участник объекта <b>{site.name}</b>.",
-            reply_markup=kb_worker_main(),
-        )
-        return
-    await add_member(session, site.id, user.id)
-    # Уведомить прораба
-    foreman_result = await session.get(type(user).__class__, site.foreman_id) if False else None
-    from db.repo import get_user_by_telegram_id as _g
-    from db.models import User
-    from sqlalchemy import select
-    res = await session.execute(select(User).where(User.id == site.foreman_id))
-    foreman = res.scalar_one_or_none()
-    if foreman:
-        try:
-            await bot.send_message(
-                foreman.telegram_id,
-                f"👷 <b>{user.name}</b> присоединился к объекту <b>{site.name}</b> по инвайт-ссылке."
-            )
-        except Exception:
-            pass
-    await message.answer(
-        f"✅ Вы успешно присоединились к объекту <b>{site.name}</b>!",
-        reply_markup=kb_worker_main(),
-    )
-
-
-async def _show_main(message: Message, user):
-    from keyboards.foreman import kb_foreman_main
-    from keyboards.worker import kb_worker_main
-    from db.models import UserRole
-    kb = kb_foreman_main() if user.role == UserRole.foreman else kb_worker_main()
-    await message.answer(f"👋 С возвращением, <b>{user.name}</b>!", reply_markup=kb)
+        await message.answer(t("reg_done", lang, name=user.name), reply_markup=kb_worker_main(lang))
