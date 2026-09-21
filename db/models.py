@@ -25,6 +25,7 @@ class User(Base):
     phone: Mapped[str] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole))
+    lang: Mapped[str] = mapped_column(String(5), default="ru")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

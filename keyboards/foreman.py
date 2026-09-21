@@ -1,13 +1,14 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from db.models import Site, Task
+from locales.i18n import t
 
 
-def kb_foreman_main() -> ReplyKeyboardMarkup:
+def kb_foreman_main(lang: str = "ru") -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🏗 Мои объекты"), KeyboardButton(text="➕ Создать объект")],
-            [KeyboardButton(text="📋 Задачи"), KeyboardButton(text="➕ Создать задачу")],
-            [KeyboardButton(text="👷 Рабочие"), KeyboardButton(text="💬 Чат")],
+            [KeyboardButton(text=t("btn_my_sites", lang)), KeyboardButton(text=t("btn_create_site", lang))],
+            [KeyboardButton(text=t("btn_tasks", lang)), KeyboardButton(text=t("btn_create_task", lang))],
+            [KeyboardButton(text=t("btn_workers", lang)), KeyboardButton(text=t("btn_chat", lang))],
         ],
         resize_keyboard=True,
     )
@@ -33,7 +34,7 @@ def kb_tasks_inline(tasks: list[Task], prefix: str = "f_task") -> InlineKeyboard
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def kb_task_foreman(task_id: int) -> InlineKeyboardMarkup:
+def kb_task_foreman(task_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🗑 Удалить задачу", callback_data=f"f_deltask:{task_id}")],
+        [InlineKeyboardButton(text=t("btn_delete_task", lang), callback_data=f"f_deltask:{task_id}")],
     ])

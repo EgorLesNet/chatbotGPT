@@ -1,0 +1,485 @@
+LANGUAGES = {
+    "ru": "🇷🇺 Русский",
+    "en": "🇬🇧 English",
+    "tg": "🇹🇯 Тоҷикӣ",
+    "uz": "🇺🇿 O'zbek",
+}
+
+TRANSLATIONS = {
+    # ── Выбор языка ──
+    "choose_language": {
+        "ru": "🌐 Выберите язык:",
+        "en": "🌐 Choose language:",
+        "tg": "🌐 Забонро интихоб кунед:",
+        "uz": "🌐 Tilni tanlang:",
+    },
+    # ── Приветствие / регистрация ──
+    "welcome": {
+        "ru": "👋 Добро пожаловать на платформу <b>Прораб</b>!\n\nПоделитесь номером телефона для регистрации:",
+        "en": "👋 Welcome to <b>Prorab</b> platform!\n\nShare your phone number to register:",
+        "tg": "👋 Ба платформаи <b>Прораб</b> хуш омадед!\n\nБарои бақайдгирӣ рақами телефони худро иҷозат диҳед:",
+        "uz": "👋 <b>Prоrab</b> platformasiga xush kelibsiz!\n\nRo'yxatdan o'tish uchun telefon raqamingizni ulashing:",
+    },
+    "share_phone_btn": {
+        "ru": "📱 Поделиться номером",
+        "en": "📱 Share phone number",
+        "tg": "📱 Рақами телефонро иҷозат диҳед",
+        "uz": "📱 Telefon raqamini ulashing",
+    },
+    "phone_already_registered": {
+        "ru": "⚠️ Этот номер уже зарегистрирован.",
+        "en": "⚠️ This number is already registered.",
+        "tg": "⚠️ Ин рақам аллакай бақайд гирифта шудааст.",
+        "uz": "⚠️ Bu raqam allaqachon ro'yxatdan o'tgan.",
+    },
+    "enter_name": {
+        "ru": "Как вас зовут? (имя и фамилия)",
+        "en": "What is your name? (first and last name)",
+        "tg": "Номи шумо чист? (ном ва насаб)",
+        "uz": "Ismingiz nima? (ism va familiya)",
+    },
+    "choose_role": {
+        "ru": "Выберите вашу роль:",
+        "en": "Choose your role:",
+        "tg": "Нақши худро интихоб кунед:",
+        "uz": "Rolingizni tanlang:",
+    },
+    "role_foreman": {
+        "ru": "👷 Я прораб",
+        "en": "👷 I am foreman",
+        "tg": "👷 Ман устод ҳастам",
+        "uz": "👷 Men ustaman",
+    },
+    "role_worker": {
+        "ru": "🔨 Я рабочий",
+        "en": "🔨 I am worker",
+        "tg": "🔨 Ман коргар ҳастам",
+        "uz": "🔨 Men ishchiman",
+    },
+    "reg_done": {
+        "ru": "✅ Регистрация завершена! Добро пожаловать, <b>{name}</b>!",
+        "en": "✅ Registration complete! Welcome, <b>{name}</b>!",
+        "tg": "✅ Бақайдгирӣ анҷом ёфт! Хуш омадед, <b>{name}</b>!",
+        "uz": "✅ Ro'yxatdan o'tish yakunlandi! Xush kelibsiz, <b>{name}</b>!",
+    },
+    "welcome_back": {
+        "ru": "👋 С возвращением, <b>{name}</b>!",
+        "en": "👋 Welcome back, <b>{name}</b>!",
+        "tg": "👋 Хуш омадед, <b>{name}</b>!",
+        "uz": "👋 Qaytib kelganingiz bilan, <b>{name}</b>!",
+    },
+    "invalid_invite": {
+        "ru": "❌ Неверный инвайт-код.",
+        "en": "❌ Invalid invite code.",
+        "tg": "❌ Рамзи даъватнома нодуруст аст.",
+        "uz": "❌ Noto'g'ri taklif kodi.",
+    },
+    "already_member": {
+        "ru": "ℹ️ Вы уже участник объекта <b>{name}</b>.",
+        "en": "ℹ️ You are already a member of <b>{name}</b>.",
+        "tg": "ℹ️ Шумо аллакай узви объекти <b>{name}</b> ҳастед.",
+        "uz": "ℹ️ Siz allaqachon <b>{name}</b> ob'ektining a'zosisiz.",
+    },
+    "joined_site": {
+        "ru": "✅ Вы успешно присоединились к объекту <b>{name}</b>!",
+        "en": "✅ You successfully joined <b>{name}</b>!",
+        "tg": "✅ Шумо бомуваффақият ба объекти <b>{name}</b> ҳамроҳ шудед!",
+        "uz": "✅ Siz muvaffaqiyatli <b>{name}</b> ob'ektiga qo'shildingiz!",
+    },
+    "worker_joined_notify": {
+        "ru": "👷 <b>{worker}</b> присоединился к объекту <b>{site}</b> по инвайт-ссылке.",
+        "en": "👷 <b>{worker}</b> joined <b>{site}</b> via invite link.",
+        "tg": "👷 <b>{worker}</b> тавассути истинода ба объекти <b>{site}</b> ҳамроҳ шуд.",
+        "uz": "👷 <b>{worker}</b> taklif havolasi orqali <b>{site}</b> ob'ektiga qo'shildi.",
+    },
+    # ── Главное меню прораба ──
+    "btn_my_sites": {
+        "ru": "🏗 Мои объекты",
+        "en": "🏗 My sites",
+        "tg": "🏗 Объектҳои ман",
+        "uz": "🏗 Mening ob'ektlarim",
+    },
+    "btn_create_site": {
+        "ru": "➕ Создать объект",
+        "en": "➕ Create site",
+        "tg": "➕ Объект эҷод кунед",
+        "uz": "➕ Ob'ekt yaratish",
+    },
+    "btn_tasks": {
+        "ru": "📋 Задачи",
+        "en": "📋 Tasks",
+        "tg": "📋 Вазифаҳо",
+        "uz": "📋 Vazifalar",
+    },
+    "btn_create_task": {
+        "ru": "➕ Создать задачу",
+        "en": "➕ Create task",
+        "tg": "➕ Вазифа эҷод кунед",
+        "uz": "➕ Vazifa yaratish",
+    },
+    "btn_workers": {
+        "ru": "👷 Рабочие",
+        "en": "👷 Workers",
+        "tg": "👷 Коргарон",
+        "uz": "👷 Ishchilar",
+    },
+    "btn_chat": {
+        "ru": "💬 Чат",
+        "en": "💬 Chat",
+        "tg": "💬 Чат",
+        "uz": "💬 Chat",
+    },
+    # ── Главное меню рабочего ──
+    "btn_worker_sites": {
+        "ru": "🏗 Мои объекты",
+        "en": "🏗 My sites",
+        "tg": "🏗 Объектҳои ман",
+        "uz": "🏗 Mening ob'ektlarim",
+    },
+    "btn_worker_tasks": {
+        "ru": "📋 Мои задачи",
+        "en": "📋 My tasks",
+        "tg": "📋 Вазифаҳои ман",
+        "uz": "📋 Mening vazifalarim",
+    },
+    "btn_worker_chat": {
+        "ru": "💬 Чат рабочего",
+        "en": "💬 Worker chat",
+        "tg": "💬 Чати коргар",
+        "uz": "💬 Ishchi chati",
+    },
+    # ── Объекты ──
+    "no_sites_foreman": {
+        "ru": "У вас пока нет объектов. Нажмите '➕ Создать объект'.",
+        "en": "You have no sites yet. Press '➕ Create site'.",
+        "tg": "Шумо ҳанӯз объект надоред. '➕ Объект эҷод кунед'-ро пахш кунед.",
+        "uz": "Sizda hali ob'ektlar yo'q. '➕ Ob'ekt yaratish' tugmasini bosing.",
+    },
+    "your_sites": {
+        "ru": "Ваши объекты:",
+        "en": "Your sites:",
+        "tg": "Объектҳои шумо:",
+        "uz": "Sizning ob'ektlaringiz:",
+    },
+    "enter_site_name": {
+        "ru": "Введите название объекта:",
+        "en": "Enter site name:",
+        "tg": "Номи объектро ворид кунед:",
+        "uz": "Ob'ekt nomini kiriting:",
+    },
+    "enter_site_address": {
+        "ru": "Теперь введите адрес объекта:",
+        "en": "Now enter the site address:",
+        "tg": "Акнун суроғаи объектро ворид кунед:",
+        "uz": "Endi ob'ekt manzilini kiriting:",
+    },
+    "site_created": {
+        "ru": "✅ Объект <b>{name}</b> создан!\n\n🔗 Инвайт-ссылка для рабочих:\n<code>{link}</code>",
+        "en": "✅ Site <b>{name}</b> created!\n\n🔗 Invite link for workers:\n<code>{link}</code>",
+        "tg": "✅ Объекти <b>{name}</b> сохта шуд!\n\n🔗 Истиноди даъват барои коргарон:\n<code>{link}</code>",
+        "uz": "✅ <b>{name}</b> ob'ekti yaratildi!\n\n🔗 Ishchilar uchun taklif havolasi:\n<code>{link}</code>",
+    },
+    "site_not_found": {
+        "ru": "Объект не найден.",
+        "en": "Site not found.",
+        "tg": "Объект ёфт нашуд.",
+        "uz": "Ob'ekt topilmadi.",
+    },
+    "site_detail": {
+        "ru": "🏗 <b>{name}</b>\n📍 {address}\n👷 Рабочие: {workers}\n\n🔗 Инвайт-ссылка:\n<code>{link}</code>",
+        "en": "🏗 <b>{name}</b>\n📍 {address}\n👷 Workers: {workers}\n\n🔗 Invite link:\n<code>{link}</code>",
+        "tg": "🏗 <b>{name}</b>\n📍 {address}\n👷 Коргарон: {workers}\n\n🔗 Истинод:\n<code>{link}</code>",
+        "uz": "🏗 <b>{name}</b>\n📍 {address}\n👷 Ishchilar: {workers}\n\n🔗 Taklif havolasi:\n<code>{link}</code>",
+    },
+    "no_workers": {
+        "ru": "Нет рабочих",
+        "en": "No workers",
+        "tg": "Коргар нест",
+        "uz": "Ishchilar yo'q",
+    },
+    "select_site": {
+        "ru": "Выберите объект:",
+        "en": "Select site:",
+        "tg": "Объектро интихоб кунед:",
+        "uz": "Ob'ektni tanlang:",
+    },
+    # ── Задачи ──
+    "no_tasks": {
+        "ru": "На этом объекте нет задач.",
+        "en": "No tasks on this site.",
+        "tg": "Дар ин объект вазифае нест.",
+        "uz": "Bu ob'ektda vazifalar yo'q.",
+    },
+    "active_tasks": {
+        "ru": "📋 Активные задачи:",
+        "en": "📋 Active tasks:",
+        "tg": "📋 Вазифаҳои фаъол:",
+        "uz": "📋 Faol vazifalar:",
+    },
+    "no_active_tasks": {
+        "ru": "Активных задач нет.",
+        "en": "No active tasks.",
+        "tg": "Вазифаҳои фаъол нест.",
+        "uz": "Faol vazifalar yo'q.",
+    },
+    "archive_btn": {
+        "ru": "📦 Архив ({count})",
+        "en": "📦 Archive ({count})",
+        "tg": "📦 Бойгонӣ ({count})",
+        "uz": "📦 Arxiv ({count})",
+    },
+    "archive_title": {
+        "ru": "📦 <b>Архив выполненных задач:</b>",
+        "en": "📦 <b>Completed tasks archive:</b>",
+        "tg": "📦 <b>Бойгонии вазифаҳои иҷрошуда:</b>",
+        "uz": "📦 <b>Bajarilgan vazifalar arxivi:</b>",
+    },
+    "no_done_tasks": {
+        "ru": "Выполненных задач пока нет.",
+        "en": "No completed tasks yet.",
+        "tg": "Вазифаҳои иҷрошуда ҳанӯз нест.",
+        "uz": "Hali bajarilgan vazifalar yo'q.",
+    },
+    "back_btn": {
+        "ru": "← Назад",
+        "en": "← Back",
+        "tg": "← Бозгашт",
+        "uz": "← Orqaga",
+    },
+    "task_not_found": {
+        "ru": "Задача не найдена.",
+        "en": "Task not found.",
+        "tg": "Вазифа ёфт нашуд.",
+        "uz": "Vazifa topilmadi.",
+    },
+    "task_detail": {
+        "ru": "<b>{title}</b>\n\n{desc}\n\nСтатус: {status}",
+        "en": "<b>{title}</b>\n\n{desc}\n\nStatus: {status}",
+        "tg": "<b>{title}</b>\n\n{desc}\n\nВазъ: {status}",
+        "uz": "<b>{title}</b>\n\n{desc}\n\nHolat: {status}",
+    },
+    "task_detail_worker": {
+        "ru": "\nВыполняет: {name}",
+        "en": "\nAssigned to: {name}",
+        "tg": "\nИҷро мекунад: {name}",
+        "uz": "\nBajaruvchi: {name}",
+    },
+    "status_open": {
+        "ru": "🔵 Открыта",
+        "en": "🔵 Open",
+        "tg": "🔵 Кушода",
+        "uz": "🔵 Ochiq",
+    },
+    "status_in_progress": {
+        "ru": "🟡 В работе",
+        "en": "🟡 In progress",
+        "tg": "🟡 Дар кор",
+        "uz": "🟡 Jarayonda",
+    },
+    "status_done": {
+        "ru": "🟢 Выполнена",
+        "en": "🟢 Done",
+        "tg": "🟢 Иҷро шуд",
+        "uz": "🟢 Bajarildi",
+    },
+    "btn_delete_task": {
+        "ru": "🗑 Удалить задачу",
+        "en": "🗑 Delete task",
+        "tg": "🗑 Вазифаро нест кунед",
+        "uz": "🗑 Vazifani o'chirish",
+    },
+    "enter_task_name": {
+        "ru": "Введите название задачи:",
+        "en": "Enter task name:",
+        "tg": "Номи вазифаро ворид кунед:",
+        "uz": "Vazifa nomini kiriting:",
+    },
+    "enter_task_desc": {
+        "ru": "Опишите задачу подробнее (или отправьте '-' чтобы пропустить):",
+        "en": "Describe the task (or send '-' to skip):",
+        "tg": "Вазифаро муфассал тавсиф кунед (ё '-' фиристед):",
+        "uz": "Vazifani batafsil tavsiflang (yoki '-' yuboring):",
+    },
+    "task_created": {
+        "ru": "✅ Задача <b>{title}</b> создана!",
+        "en": "✅ Task <b>{title}</b> created!",
+        "tg": "✅ Вазифаи <b>{title}</b> сохта шуд!",
+        "uz": "✅ <b>{title}</b> vazifasi yaratildi!",
+    },
+    "new_task_notify": {
+        "ru": "📌 Новая задача на объекте <b>{site}</b>:\n<b>{title}</b>\n{desc}",
+        "en": "📌 New task on <b>{site}</b>:\n<b>{title}</b>\n{desc}",
+        "tg": "📌 Вазифаи нав дар объекти <b>{site}</b>:\n<b>{title}</b>\n{desc}",
+        "uz": "📌 <b>{site}</b> ob'ektida yangi vazifa:\n<b>{title}</b>\n{desc}",
+    },
+    "no_active_tasks_worker": {
+        "ru": "На этом объекте нет активных задач.",
+        "en": "No active tasks on this site.",
+        "tg": "Дар ин объект вазифаи фаъоле нест.",
+        "uz": "Bu ob'ektda faol vazifalar yo'q.",
+    },
+    "btn_take_task": {
+        "ru": "▶️ Взять задачу",
+        "en": "▶️ Take task",
+        "tg": "▶️ Вазифаро қабул кунед",
+        "uz": "▶️ Vazifani olish",
+    },
+    "btn_done_task": {
+        "ru": "✅ Отметить выполненной",
+        "en": "✅ Mark as done",
+        "tg": "✅ Иҷрошуда нишон диҳед",
+        "uz": "✅ Bajarilgan deb belgilash",
+    },
+    "task_taken": {
+        "ru": "✅ Вы взяли задачу <b>{title}</b>.",
+        "en": "✅ You took task <b>{title}</b>.",
+        "tg": "✅ Шумо вазифаи <b>{title}</b>-ро қабул кардед.",
+        "uz": "✅ Siz <b>{title}</b> vazifasini oldingiz.",
+    },
+    "task_already_taken": {
+        "ru": "Задача уже занята или не найдена.",
+        "en": "Task already taken or not found.",
+        "tg": "Вазифа аллакай гирифта шудааст ё ёфт нашуд.",
+        "uz": "Vazifa allaqachon olingan yoki topilmadi.",
+    },
+    "task_taken_notify": {
+        "ru": "▶️ <b>{worker}</b> взял задачу <b>{task}</b> на объекте <b>{site}</b>.",
+        "en": "▶️ <b>{worker}</b> took task <b>{task}</b> on <b>{site}</b>.",
+        "tg": "▶️ <b>{worker}</b> вазифаи <b>{task}</b>-ро дар объекти <b>{site}</b> қабул кард.",
+        "uz": "▶️ <b>{worker}</b> <b>{site}</b> ob'ektida <b>{task}</b> vazifasini oldi.",
+    },
+    "send_photos": {
+        "ru": "📸 Отправьте фото выполненной работы (1–5 фото).\nКогда закончите — напишите <b>готово</b>.",
+        "en": "📸 Send photos of completed work (1–5 photos).\nWhen done — type <b>done</b>.",
+        "tg": "📸 Акси корҳои иҷрошударо бифиристед (1–5 акс).\nВақте тамом шуд — <b>тайёр</b> нависед.",
+        "uz": "📸 Bajarilgan ish rasmlarini yuboring (1–5 rasm).\nTamomlanganda — <b>tayyor</b> deb yozing.",
+    },
+    "photo_received": {
+        "ru": "📸 Фото {n} получено.",
+        "en": "📸 Photo {n} received.",
+        "tg": "📸 Акси {n} қабул шуд.",
+        "uz": "📸 {n}-rasm qabul qilindi.",
+    },
+    "need_photo": {
+        "ru": "Нужно хотя бы одно фото.",
+        "en": "At least one photo is required.",
+        "tg": "Ҳадди аққал як акс лозим аст.",
+        "uz": "Kamida bitta rasm kerak.",
+    },
+    "enter_comment": {
+        "ru": "Напишите краткий комментарий к выполненной работе:",
+        "en": "Write a brief comment about the completed work:",
+        "tg": "Дар бораи кори иҷрошуда шарҳи кӯтоҳ нависед:",
+        "uz": "Bajarilgan ish haqida qisqacha izoh yozing:",
+    },
+    "report_sent": {
+        "ru": "✅ Отчёт отправлен! Задача отмечена выполненной.",
+        "en": "✅ Report sent! Task marked as done.",
+        "tg": "✅ Ҳисобот фиристода шуд! Вазифа иҷрошуда нишон дода шуд.",
+        "uz": "✅ Hisobot yuborildi! Vazifa bajarilgan deb belgilandi.",
+    },
+    "report_notify": {
+        "ru": "🟢 <b>{worker}</b> выполнил задачу <b>{task}</b>\nОбъект: {site}\nКомментарий: {comment}",
+        "en": "🟢 <b>{worker}</b> completed task <b>{task}</b>\nSite: {site}\nComment: {comment}",
+        "tg": "🟢 <b>{worker}</b> вазифаи <b>{task}</b>-ро иҷро кард\nОбъект: {site}\nШарҳ: {comment}",
+        "uz": "🟢 <b>{worker}</b> <b>{task}</b> vazifasini bajardi\nOb'ekt: {site}\nIzoh: {comment}",
+    },
+    # ── Рабочие ──
+    "no_sites_first": {
+        "ru": "Сначала создайте объект.",
+        "en": "Create a site first.",
+        "tg": "Аввал объект эҷод кунед.",
+        "uz": "Avval ob'ekt yarating.",
+    },
+    "enter_worker_phone": {
+        "ru": "📱 Введите номер телефона рабочего (7XXXXXXXXXX):",
+        "en": "📱 Enter worker phone number (7XXXXXXXXXX):",
+        "tg": "📱 Рақами телефони коргарро ворид кунед (7XXXXXXXXXX):",
+        "uz": "📱 Ishchi telefon raqamini kiriting (7XXXXXXXXXX):",
+    },
+    "worker_not_found": {
+        "ru": "Рабочий с таким номером не найден. Попросите его сначала зарегистрироваться в боте.",
+        "en": "Worker with this number not found. Ask them to register in the bot first.",
+        "tg": "Коргар бо ин рақам ёфт нашуд. Аз ӯ хоҳиш кунед аввал дар бот бақайд гирад.",
+        "uz": "Bu raqamli ishchi topilmadi. Avval botda ro'yxatdan o'tishini so'rang.",
+    },
+    "select_site_for_worker": {
+        "ru": "Выберите объект для {name}:",
+        "en": "Select site for {name}:",
+        "tg": "Барои {name} объект интихоб кунед:",
+        "uz": "{name} uchun ob'ektni tanlang:",
+    },
+    "worker_already_on_site": {
+        "ru": "{name} уже есть на этом объекте.",
+        "en": "{name} is already on this site.",
+        "tg": "{name} аллакай дар ин объект аст.",
+        "uz": "{name} allaqachon bu ob'ektda.",
+    },
+    "worker_added": {
+        "ru": "✅ {name} добавлен на объект.",
+        "en": "✅ {name} added to site.",
+        "tg": "✅ {name} ба объект илова шуд.",
+        "uz": "✅ {name} ob'ektga qo'shildi.",
+    },
+    # ── Чат ──
+    "no_sites_worker": {
+        "ru": "Вы не состоите ни в одном объекте.\nПопросите прораба отправить вам инвайт-ссылку.",
+        "en": "You are not a member of any site.\nAsk your foreman to send you an invite link.",
+        "tg": "Шумо дар ягон объект нестед.\nАз устод хоҳиш кунед истиноди даъватро барои шумо бифиристад.",
+        "uz": "Siz hech qanday ob'ektda yo'qsiz.\nUstadan sizga taklif havolasini yuborishini so'rang.",
+    },
+    "select_site_chat": {
+        "ru": "Выберите объект для чата:",
+        "en": "Select site for chat:",
+        "tg": "Барои чат объект интихоб кунед:",
+        "uz": "Chat uchun ob'ektni tanlang:",
+    },
+    "chat_header": {
+        "ru": "💬 Чат объекта <b>{name}</b>\n\n{history}\nПишите — сообщение получат все участники.\n/start — выйти из чата.",
+        "en": "💬 Chat of <b>{name}</b>\n\n{history}\nWrite — all participants will receive the message.\n/start — exit chat.",
+        "tg": "💬 Чати объекти <b>{name}</b>\n\n{history}\nНависед — ҳама иштирокчиён паёмро мегиранд.\n/start — аз чат баромадан.",
+        "uz": "💬 <b>{name}</b> ob'ekti chati\n\n{history}\nYozing — barcha ishtirokchilar xabarni oladi.\n/start — chatdan chiqish.",
+    },
+    "no_messages": {
+        "ru": "(Сообщений пока нет)\n",
+        "en": "(No messages yet)\n",
+        "tg": "(Ҳанӯз паём нест)\n",
+        "uz": "(Hali xabarlar yo'q)\n",
+    },
+    "chat_message": {
+        "ru": "💬 <b>{name}</b> [{site}]:\n{text}",
+        "en": "💬 <b>{name}</b> [{site}]:\n{text}",
+        "tg": "💬 <b>{name}</b> [{site}]:\n{text}",
+        "uz": "💬 <b>{name}</b> [{site}]:\n{text}",
+    },
+    "done_word": {
+        "ru": "готово",
+        "en": "done",
+        "tg": "тайёр",
+        "uz": "tayyor",
+    },
+    # ── Архив задач ──
+    "arch_executor": {
+        "ru": "👷 Исполнитель: {name}",
+        "en": "👷 Executor: {name}",
+        "tg": "👷 Иҷрокунанда: {name}",
+        "uz": "👷 Bajaruvchi: {name}",
+    },
+    "arch_comment": {
+        "ru": "💬 Комментарий: {comment}",
+        "en": "💬 Comment: {comment}",
+        "tg": "💬 Шарҳ: {comment}",
+        "uz": "💬 Izoh: {comment}",
+    },
+}
+
+
+def t(key: str, lang: str, **kwargs) -> str:
+    translations = TRANSLATIONS.get(key, {})
+    text = translations.get(lang) or translations.get("ru", key)
+    if kwargs:
+        try:
+            text = text.format(**kwargs)
+        except KeyError:
+            pass
+    return text

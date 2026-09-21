@@ -16,12 +16,19 @@ async def get_user_by_phone(session: AsyncSession, phone: str) -> User | None:
     return result.scalar_one_or_none()
 
 
-async def create_user(session: AsyncSession, telegram_id: int, phone: str, name: str, role: UserRole) -> User:
-    user = User(telegram_id=telegram_id, phone=phone, name=name, role=role)
+async def create_user(session: AsyncSession, telegram_id: int, phone: str, name: str, role: UserRole, lang: str = "ru") -> User:
+    user = User(telegram_id=telegram_id, phone=phone, name=name, role=role, lang=lang)
     session.add(user)
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def set_user_lang(session: AsyncSession, telegram_id: int, lang: str) -> None:
+    await session.execute(
+        update(User).where(User.telegram_id == telegram_id).values(lang=lang)
+    )
+    await session.commit()
 
 
 # ── Sites ──────────────────────────────────────────────────────────────────
@@ -88,7 +95,6 @@ async def get_site_worker_telegram_ids(session: AsyncSession, site_id: int) -> l
 
 
 async def get_all_site_participant_telegram_ids(session: AsyncSession, site: Site) -> list[int]:
-    """Foreman + all workers on this site."""
     foreman_result = await session.execute(select(User).where(User.id == site.foreman_id))
     foreman = foreman_result.scalar_one_or_none()
     worker_ids = await get_site_worker_telegram_ids(session, site.id)
@@ -96,6 +102,12 @@ async def get_all_site_participant_telegram_ids(session: AsyncSession, site: Sit
     if foreman:
         result.append(foreman.telegram_id)
     return list(set(result))
+
+
+async def get_worker_lang(session: AsyncSession, worker_id: int) -> str:
+    res = await session.execute(select(User.lang).where(User.id == worker_id))
+    lang = res.scalar_one_or_none()
+    return lang or "ru"
 
 
 # ── Tasks ──────────────────────────────────────────────────────────────────
