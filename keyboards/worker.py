@@ -8,6 +8,7 @@ def kb_worker_main(lang: str = "ru") -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text=t("btn_worker_sites", lang)), KeyboardButton(text=t("btn_worker_tasks", lang))],
             [KeyboardButton(text=t("btn_worker_chat", lang))],
+            [KeyboardButton(text=t("btn_settings", lang))],
         ],
         resize_keyboard=True,
     )

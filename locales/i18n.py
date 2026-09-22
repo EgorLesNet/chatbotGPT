@@ -129,6 +129,31 @@ TRANSLATIONS = {
         "tg": "💬 Чат",
         "uz": "💬 Chat",
     },
+    "btn_settings": {
+        "ru": "⚙️ Настройки",
+        "en": "⚙️ Settings",
+        "tg": "⚙️ Танзимот",
+        "uz": "⚙️ Sozlamalar",
+    },
+    # ── Настройки ──
+    "settings_title": {
+        "ru": "⚙️ Настройки",
+        "en": "⚙️ Settings",
+        "tg": "⚙️ Танзимот",
+        "uz": "⚙️ Sozlamalar",
+    },
+    "settings_notif_on": {
+        "ru": "🔔 Уведомления чата: Вкл",
+        "en": "🔔 Chat notifications: On",
+        "tg": "🔔 Огоҳиҳои чат: Фаъол",
+        "uz": "🔔 Chat bildirishnomalar: Yoqilgan",
+    },
+    "settings_notif_off": {
+        "ru": "🔕 Уведомления чата: Выкл",
+        "en": "🔕 Chat notifications: Off",
+        "tg": "🔕 Огоҳиҳои чат: Ғайрифаъол",
+        "uz": "🔕 Chat bildirishnomalar: O'chirilgan",
+    },
     # ── Главное меню рабочего ──
     "btn_worker_sites": {
         "ru": "🏗 Мои объекты",

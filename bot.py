@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 from db.base import init_db
 from handlers.auth import router as auth_router
+from handlers.settings import router as settings_router
 from handlers.foreman.sites import router as f_sites_router
 from handlers.foreman.tasks import router as f_tasks_router
 from handlers.foreman.workers import router as f_workers_router
@@ -36,6 +37,7 @@ async def main():
 
     dp.include_routers(
         auth_router,
+        settings_router,
         f_sites_router,
         f_tasks_router,
         f_workers_router,

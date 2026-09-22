@@ -9,6 +9,7 @@ def kb_foreman_main(lang: str = "ru") -> ReplyKeyboardMarkup:
             [KeyboardButton(text=t("btn_my_sites", lang)), KeyboardButton(text=t("btn_create_site", lang))],
             [KeyboardButton(text=t("btn_tasks", lang)), KeyboardButton(text=t("btn_create_task", lang))],
             [KeyboardButton(text=t("btn_workers", lang)), KeyboardButton(text=t("btn_chat", lang))],
+            [KeyboardButton(text=t("btn_settings", lang))],
         ],
         resize_keyboard=True,
     )

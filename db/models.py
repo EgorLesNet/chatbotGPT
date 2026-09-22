@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import (
-    Integer, String, BigInteger, DateTime, ForeignKey, Text, Enum as SAEnum
+    Integer, String, BigInteger, DateTime, ForeignKey, Text, Boolean, Enum as SAEnum
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.base import Base
@@ -26,6 +26,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole))
     lang: Mapped[str] = mapped_column(String(5), default="ru")
+    notifications: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
