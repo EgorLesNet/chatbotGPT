@@ -6,14 +6,12 @@ LANGUAGES = {
 }
 
 TRANSLATIONS = {
-    # ── Выбор языка ──
     "choose_language": {
         "ru": "🌐 Выберите язык:",
         "en": "🌐 Choose language:",
         "tg": "🌐 Забонро интихоб кунед:",
         "uz": "🌐 Tilni tanlang:",
     },
-    # ── Приветствие / регистрация ──
     "welcome": {
         "ru": "👋 Добро пожаловать на платформу <b>Прораб</b>!\n\nПоделитесь номером телефона для регистрации:",
         "en": "👋 Welcome to <b>Prorab</b> platform!\n\nShare your phone number to register:",
@@ -92,7 +90,6 @@ TRANSLATIONS = {
         "tg": "👷 <b>{worker}</b> тавассути истинода ба объекти <b>{site}</b> ҳамроҳ шуд.",
         "uz": "👷 <b>{worker}</b> taklif havolasi orqali <b>{site}</b> ob'ektiga qo'shildi.",
     },
-    # ── Главное меню прораба ──
     "btn_my_sites": {
         "ru": "🏗 Мои объекты",
         "en": "🏗 My sites",
@@ -135,7 +132,6 @@ TRANSLATIONS = {
         "tg": "⚙️ Танзимот",
         "uz": "⚙️ Sozlamalar",
     },
-    # ── Настройки ──
     "settings_title": {
         "ru": "⚙️ Настройки",
         "en": "⚙️ Settings",
@@ -154,7 +150,6 @@ TRANSLATIONS = {
         "tg": "🔕 Огоҳиҳои чат: Ғайрифаъол",
         "uz": "🔕 Chat bildirishnomalar: O'chirilgan",
     },
-    # ── Главное меню рабочего ──
     "btn_worker_sites": {
         "ru": "🏗 Мои объекты",
         "en": "🏗 My sites",
@@ -173,7 +168,6 @@ TRANSLATIONS = {
         "tg": "💬 Чати коргар",
         "uz": "💬 Ishchi chati",
     },
-    # ── Объекты ──
     "no_sites_foreman": {
         "ru": "У вас пока нет объектов. Нажмите '➕ Создать объект'.",
         "en": "You have no sites yet. Press '➕ Create site'.",
@@ -197,6 +191,18 @@ TRANSLATIONS = {
         "en": "Now enter the site address:",
         "tg": "Акнун суроғаи объектро ворид кунед:",
         "uz": "Endi ob'ekt manzilini kiriting:",
+    },
+    "enter_site_media": {
+        "ru": "Отправьте фото и видео объекта. Когда закончите — напишите <b>готово</b>. Если медиа нет — напишите <b>пропустить</b>.",
+        "en": "Send site photos and videos. When done — type <b>done</b>. If no media — type <b>skip</b>.",
+        "tg": "Аксҳо ва видеоҳои объектро фиристед. Вақте тамом шуд — <b>тайёр</b> нависед. Агар медиа набошад — <b>гузаронед</b> нависед.",
+        "uz": "Ob'ekt foto va videolarini yuboring. Tugagach — <b>tayyor</b> deb yozing. Media bo'lmasa — <b>o'tkazib yuborish</b> deb yozing.",
+    },
+    "video_received": {
+        "ru": "🎬 Видео {n} получено.",
+        "en": "🎬 Video {n} received.",
+        "tg": "🎬 Видеои {n} қабул шуд.",
+        "uz": "🎬 {n}-video qabul qilindi.",
     },
     "site_created": {
         "ru": "✅ Объект <b>{name}</b> создан!\n\n🔗 Инвайт-ссылка для рабочих:\n<code>{link}</code>",
@@ -228,7 +234,6 @@ TRANSLATIONS = {
         "tg": "Объектро интихоб кунед:",
         "uz": "Ob'ektni tanlang:",
     },
-    # ── Задачи ──
     "no_tasks": {
         "ru": "На этом объекте нет задач.",
         "en": "No tasks on this site.",
@@ -301,6 +306,12 @@ TRANSLATIONS = {
         "tg": "🟡 Дар кор",
         "uz": "🟡 Jarayonda",
     },
+    "status_review": {
+        "ru": "🟠 На проверке",
+        "en": "🟠 In review",
+        "tg": "🟠 Дар санҷиш",
+        "uz": "🟠 Tekshiruvda",
+    },
     "status_done": {
         "ru": "🟢 Выполнена",
         "en": "🟢 Done",
@@ -313,6 +324,18 @@ TRANSLATIONS = {
         "tg": "🗑 Вазифаро нест кунед",
         "uz": "🗑 Vazifani o'chirish",
     },
+    "btn_rework": {
+        "ru": "📝 Отправить на доработку",
+        "en": "📝 Send for rework",
+        "tg": "📝 Барои такмил фиристед",
+        "uz": "📝 Qayta ishlashga yuborish",
+    },
+    "btn_accept_review": {
+        "ru": "✅ Принять работу",
+        "en": "✅ Accept work",
+        "tg": "✅ Корро қабул кунед",
+        "uz": "✅ Ishni qabul qilish",
+    },
     "enter_task_name": {
         "ru": "Введите название задачи:",
         "en": "Enter task name:",
@@ -324,6 +347,18 @@ TRANSLATIONS = {
         "en": "Describe the task (or send '-' to skip):",
         "tg": "Вазифаро муфассал тавсиф кунед (ё '-' фиристед):",
         "uz": "Vazifani batafsil tavsiflang (yoki '-' yuboring):",
+    },
+    "send_task_photo": {
+        "ru": "Отправьте фото участка для задачи. Если фото не нужно — напишите <b>пропустить</b>.",
+        "en": "Send a site area photo for the task. If no photo is needed — type <b>skip</b>.",
+        "tg": "Акси қитъаро барои вазифа фиристед. Агар акс лозим набошад — <b>гузаронед</b> нависед.",
+        "uz": "Vazifa учун hudud rasmini yuboring. Agar rasm kerak bo'lmasa — <b>o'tkazib yuborish</b> deb yozing.",
+    },
+    "task_area_photo": {
+        "ru": "📸 Фото участка",
+        "en": "📸 Area photo",
+        "tg": "📸 Акси қитъа",
+        "uz": "📸 Hudud rasmi",
     },
     "task_created": {
         "ru": "✅ Задача <b>{title}</b> создана!",
@@ -350,10 +385,10 @@ TRANSLATIONS = {
         "uz": "▶️ Vazifani olish",
     },
     "btn_done_task": {
-        "ru": "✅ Отметить выполненной",
-        "en": "✅ Mark as done",
-        "tg": "✅ Иҷрошуда нишон диҳед",
-        "uz": "✅ Bajarilgan deb belgilash",
+        "ru": "✅ Отправить на проверку",
+        "en": "✅ Send for review",
+        "tg": "✅ Барои санҷиш фиристед",
+        "uz": "✅ Tekshiruvga yuborish",
     },
     "task_taken": {
         "ru": "✅ Вы взяли задачу <b>{title}</b>.",
@@ -379,6 +414,12 @@ TRANSLATIONS = {
         "tg": "📸 Акси корҳои иҷрошударо бифиристед (1–5 акс).\nВақте тамом шуд — <b>тайёр</b> нависед.",
         "uz": "📸 Bajarilgan ish rasmlarini yuboring (1–5 rasm).\nTamomlanganda — <b>tayyor</b> deb yozing.",
     },
+    "send_min_3_photos": {
+        "ru": "📸 Отправьте минимум 3 фото выполненной работы для ревью. Когда закончите — напишите <b>готово</b>.",
+        "en": "📸 Send at least 3 photos of the completed work for review. When done — type <b>done</b>.",
+        "tg": "📸 Барои санҷиш ҳадди ақал 3 акс аз кори иҷрошуда фиристед. Вақте тамом шуд — <b>тайёр</b> нависед.",
+        "uz": "📸 Tekshiruv uchun bajarilgan ishning kamida 3 ta rasmini yuboring. Tugagach — <b>tayyor</b> deb yozing.",
+    },
     "photo_received": {
         "ru": "📸 Фото {n} получено.",
         "en": "📸 Photo {n} received.",
@@ -390,6 +431,12 @@ TRANSLATIONS = {
         "en": "At least one photo is required.",
         "tg": "Ҳадди аққал як акс лозим аст.",
         "uz": "Kamida bitta rasm kerak.",
+    },
+    "need_min_3_photos": {
+        "ru": "Нужно минимум 3 фото для отправки на ревью.",
+        "en": "At least 3 photos are required for review.",
+        "tg": "Барои санҷиш ҳадди ақал 3 акс лозим аст.",
+        "uz": "Tekshiruv uchun kamida 3 ta rasm kerak.",
     },
     "enter_comment": {
         "ru": "Напишите краткий комментарий к выполненной работе:",
@@ -403,13 +450,66 @@ TRANSLATIONS = {
         "tg": "✅ Ҳисобот фиристода шуд! Вазифа иҷрошуда нишон дода шуд.",
         "uz": "✅ Hisobot yuborildi! Vazifa bajarilgan deb belgilandi.",
     },
+    "report_sent_review": {
+        "ru": "✅ Отчёт отправлен на проверку прорабу.",
+        "en": "✅ Report sent to foreman for review.",
+        "tg": "✅ Ҳисобот барои санҷиш ба усто фиристода шуд.",
+        "uz": "✅ Hisobot tekshiruv uchun ustaga yuborildi.",
+    },
     "report_notify": {
         "ru": "🟢 <b>{worker}</b> выполнил задачу <b>{task}</b>\nОбъект: {site}\nКомментарий: {comment}",
         "en": "🟢 <b>{worker}</b> completed task <b>{task}</b>\nSite: {site}\nComment: {comment}",
         "tg": "🟢 <b>{worker}</b> вазифаи <b>{task}</b>-ро иҷро кард\nОбъект: {site}\nШарҳ: {comment}",
         "uz": "🟢 <b>{worker}</b> <b>{task}</b> vazifasini bajardi\nOb'ekt: {site}\nIzoh: {comment}",
     },
-    # ── Рабочие ──
+    "report_notify_review": {
+        "ru": "🟠 <b>{worker}</b> отправил задачу <b>{task}</b> на ревью\nОбъект: {site}\nКомментарий: {comment}",
+        "en": "🟠 <b>{worker}</b> sent task <b>{task}</b> for review\nSite: {site}\nComment: {comment}",
+        "tg": "🟠 <b>{worker}</b> вазифаи <b>{task}</b>-ро барои санҷиш фиристод\nОбъект: {site}\nШарҳ: {comment}",
+        "uz": "🟠 <b>{worker}</b> <b>{task}</b> vazifasini tekshiruvga yubordi\nOb'ekt: {site}\nIzoh: {comment}",
+    },
+    "enter_review_comment": {
+        "ru": "Напишите комментарий для доработки:",
+        "en": "Write a rework comment:",
+        "tg": "Барои такмил шарҳ нависед:",
+        "uz": "Qayta ishlash uchun izoh yozing:",
+    },
+    "task_rework_needed": {
+        "ru": "🛠 По задаче <b>{title}</b> нужны доработки:\n{comment}",
+        "en": "🛠 Task <b>{title}</b> needs rework:\n{comment}",
+        "tg": "🛠 Барои вазифаи <b>{title}</b> такмил лозим аст:\n{comment}",
+        "uz": "🛠 <b>{title}</b> vazifasi uchun qayta ishlash kerak:\n{comment}",
+    },
+    "task_sent_to_rework": {
+        "ru": "✅ Задача отправлена на доработку.",
+        "en": "✅ Task sent for rework.",
+        "tg": "✅ Вазифа барои такмил фиристода шуд.",
+        "uz": "✅ Vazifa qayta ishlashga yuborildi.",
+    },
+    "task_review_accepted": {
+        "ru": "✅ Работа принята, задача закрыта.",
+        "en": "✅ Work accepted, task closed.",
+        "tg": "✅ Кор қабул шуд, вазифа баста шуд.",
+        "uz": "✅ Ish qabul qilindi, vazifa yopildi.",
+    },
+    "task_accepted": {
+        "ru": "✅ Прораб принял задачу <b>{title}</b>.",
+        "en": "✅ Foreman accepted task <b>{title}</b>.",
+        "tg": "✅ Усто вазифаи <b>{title}</b>-ро қабул кард.",
+        "uz": "✅ Usta <b>{title}</b> vazifasini qabul qildi.",
+    },
+    "worker_report_comment": {
+        "ru": "💬 Комментарий рабочего: {comment}",
+        "en": "💬 Worker comment: {comment}",
+        "tg": "💬 Шарҳи коргар: {comment}",
+        "uz": "💬 Ishchi izohi: {comment}",
+    },
+    "last_review_comment": {
+        "ru": "📝 Последний комментарий прораба: {comment}",
+        "en": "📝 Last foreman comment: {comment}",
+        "tg": "📝 Шарҳи охирини усто: {comment}",
+        "uz": "📝 Ustaning oxirgi izohi: {comment}",
+    },
     "no_sites_first": {
         "ru": "Сначала создайте объект.",
         "en": "Create a site first.",
@@ -446,7 +546,6 @@ TRANSLATIONS = {
         "tg": "✅ {name} ба объект илова шуд.",
         "uz": "✅ {name} ob'ektga qo'shildi.",
     },
-    # ── Чат ──
     "no_sites_worker": {
         "ru": "Вы не состоите ни в одном объекте.\nПопросите прораба отправить вам инвайт-ссылку.",
         "en": "You are not a member of any site.\nAsk your foreman to send you an invite link.",
@@ -483,7 +582,12 @@ TRANSLATIONS = {
         "tg": "тайёр",
         "uz": "tayyor",
     },
-    # ── Архив задач ──
+    "skip_word": {
+        "ru": "пропустить",
+        "en": "skip",
+        "tg": "гузаронед",
+        "uz": "o'tkazib yuborish",
+    },
     "arch_executor": {
         "ru": "👷 Исполнитель: {name}",
         "en": "👷 Executor: {name}",

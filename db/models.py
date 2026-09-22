@@ -15,6 +15,7 @@ class UserRole(enum.Enum):
 class TaskStatus(enum.Enum):
     open = "open"
     in_progress = "in_progress"
+    review = "review"
     done = "done"
 
 
@@ -37,6 +38,8 @@ class Site(Base):
     address: Mapped[str] = mapped_column(String(300))
     foreman_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     invite_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    photos_json: Mapped[str] = mapped_column(Text, default="[]")
+    videos_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     members: Mapped[list["SiteMember"]] = relationship("SiteMember", back_populates="site", lazy="selectin")
 
@@ -59,6 +62,7 @@ class Task(Base):
     status: Mapped[TaskStatus] = mapped_column(SAEnum(TaskStatus), default=TaskStatus.open)
     created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     taken_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    photo_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -69,6 +73,15 @@ class TaskReport(Base):
     worker_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     comment: Mapped[str] = mapped_column(Text, default="")
     photos_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TaskReview(Base):
+    __tablename__ = "task_reviews"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"))
+    foreman_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

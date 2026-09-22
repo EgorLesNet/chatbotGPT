@@ -1,22 +1,19 @@
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from db.models import User, Site, SiteMember, Task, TaskReport, Message, UserRole, TaskStatus
+from sqlalchemy import select, delete, update
+from db.models import Site, SiteMember, Task, TaskReport, User, Message, UserRole, TaskStatus, TaskReview
+import json
 
 
-# ── Users ──────────────────────────────────────────────────────────────────
-
-async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> User | None:
-    result = await session.execute(select(User).where(User.telegram_id == telegram_id))
-    return result.scalar_one_or_none()
+async def get_user_by_tg(session, telegram_id: int):
+    res = await session.execute(select(User).where(User.telegram_id == telegram_id))
+    return res.scalar_one_or_none()
 
 
-async def get_user_by_phone(session: AsyncSession, phone: str) -> User | None:
-    result = await session.execute(select(User).where(User.phone == phone))
-    return result.scalar_one_or_none()
+async def get_user_by_phone(session, phone: str):
+    res = await session.execute(select(User).where(User.phone == phone))
+    return res.scalar_one_or_none()
 
 
-async def create_user(session: AsyncSession, telegram_id: int, phone: str, name: str, role: UserRole, lang: str = "ru") -> User:
+async def create_user(session, telegram_id: int, phone: str, name: str, role: UserRole, lang: str = "ru"):
     user = User(telegram_id=telegram_id, phone=phone, name=name, role=role, lang=lang)
     session.add(user)
     await session.commit()
@@ -24,132 +21,115 @@ async def create_user(session: AsyncSession, telegram_id: int, phone: str, name:
     return user
 
 
-async def set_user_lang(session: AsyncSession, telegram_id: int, lang: str) -> None:
-    await session.execute(
-        update(User).where(User.telegram_id == telegram_id).values(lang=lang)
+async def create_site(session, name: str, address: str, foreman_id: int, invite_code: str, photos=None, videos=None):
+    site = Site(
+        name=name,
+        address=address,
+        foreman_id=foreman_id,
+        invite_code=invite_code,
+        photos_json=json.dumps(photos or []),
+        videos_json=json.dumps(videos or []),
     )
-    await session.commit()
-
-
-# ── Sites ──────────────────────────────────────────────────────────────────
-
-async def create_site(session: AsyncSession, name: str, address: str, foreman_id: int, invite_code: str) -> Site:
-    site = Site(name=name, address=address, foreman_id=foreman_id, invite_code=invite_code)
     session.add(site)
     await session.commit()
     await session.refresh(site)
     return site
 
 
-async def get_sites_by_foreman(session: AsyncSession, foreman_id: int) -> list[Site]:
-    result = await session.execute(
-        select(Site).where(Site.foreman_id == foreman_id).order_by(Site.created_at.desc())
-    )
-    return list(result.scalars().all())
+async def get_site_by_invite(session, invite_code: str):
+    res = await session.execute(select(Site).where(Site.invite_code == invite_code))
+    return res.scalar_one_or_none()
 
 
-async def get_site_by_id(session: AsyncSession, site_id: int) -> Site | None:
-    result = await session.execute(
-        select(Site).options(selectinload(Site.members).selectinload(SiteMember.worker))
-        .where(Site.id == site_id)
-    )
-    return result.scalar_one_or_none()
-
-
-async def get_site_by_invite_code(session: AsyncSession, code: str) -> Site | None:
-    result = await session.execute(select(Site).where(Site.invite_code == code))
-    return result.scalar_one_or_none()
-
-
-async def get_sites_for_worker(session: AsyncSession, worker_id: int) -> list[Site]:
-    result = await session.execute(
-        select(Site)
-        .join(SiteMember, SiteMember.site_id == Site.id)
-        .where(SiteMember.worker_id == worker_id)
-        .order_by(Site.created_at.desc())
-    )
-    return list(result.scalars().all())
-
-
-async def is_member(session: AsyncSession, site_id: int, worker_id: int) -> bool:
-    result = await session.execute(
-        select(SiteMember).where(SiteMember.site_id == site_id, SiteMember.worker_id == worker_id)
-    )
-    return result.scalar_one_or_none() is not None
-
-
-async def add_member(session: AsyncSession, site_id: int, worker_id: int) -> SiteMember:
+async def add_worker_to_site(session, site_id: int, worker_id: int):
     member = SiteMember(site_id=site_id, worker_id=worker_id)
     session.add(member)
     await session.commit()
     return member
 
 
-async def get_site_worker_telegram_ids(session: AsyncSession, site_id: int) -> list[int]:
-    result = await session.execute(
-        select(User.telegram_id)
-        .join(SiteMember, SiteMember.worker_id == User.id)
-        .where(SiteMember.site_id == site_id)
+async def is_worker_on_site(session, site_id: int, worker_id: int) -> bool:
+    res = await session.execute(
+        select(SiteMember).where(SiteMember.site_id == site_id, SiteMember.worker_id == worker_id)
     )
-    return list(result.scalars().all())
+    return res.scalar_one_or_none() is not None
 
 
-async def get_all_site_participant_telegram_ids(session: AsyncSession, site: Site) -> list[int]:
-    foreman_result = await session.execute(select(User).where(User.id == site.foreman_id))
-    foreman = foreman_result.scalar_one_or_none()
-    worker_ids = await get_site_worker_telegram_ids(session, site.id)
-    result = list(worker_ids)
-    if foreman:
-        result.append(foreman.telegram_id)
-    return list(set(result))
+async def get_sites_by_foreman(session, foreman_id: int):
+    res = await session.execute(select(Site).where(Site.foreman_id == foreman_id))
+    return list(res.scalars().all())
 
 
-async def get_worker_lang(session: AsyncSession, worker_id: int) -> str:
-    res = await session.execute(select(User.lang).where(User.id == worker_id))
-    lang = res.scalar_one_or_none()
-    return lang or "ru"
+async def get_sites_for_worker(session, worker_id: int):
+    res = await session.execute(
+        select(Site).join(SiteMember, SiteMember.site_id == Site.id).where(SiteMember.worker_id == worker_id)
+    )
+    return list(res.scalars().all())
 
 
-# ── Tasks ──────────────────────────────────────────────────────────────────
+async def get_site_by_id(session, site_id: int):
+    res = await session.execute(select(Site).where(Site.id == site_id))
+    return res.scalar_one_or_none()
 
-async def create_task(session: AsyncSession, site_id: int, title: str, description: str, created_by: int) -> Task:
-    task = Task(site_id=site_id, title=title, description=description, created_by=created_by)
+
+async def create_task(session, site_id: int, title: str, description: str, created_by: int, photo_id: str | None = None):
+    task = Task(site_id=site_id, title=title, description=description, created_by=created_by, photo_id=photo_id)
     session.add(task)
     await session.commit()
     await session.refresh(task)
     return task
 
 
-async def get_tasks_by_site(session: AsyncSession, site_id: int) -> list[Task]:
-    result = await session.execute(
-        select(Task).where(Task.site_id == site_id).order_by(Task.created_at.desc())
-    )
-    return list(result.scalars().all())
+async def get_tasks_by_site(session, site_id: int):
+    res = await session.execute(select(Task).where(Task.site_id == site_id).order_by(Task.created_at.desc()))
+    return list(res.scalars().all())
 
 
-async def get_task_by_id(session: AsyncSession, task_id: int) -> Task | None:
-    result = await session.execute(select(Task).where(Task.id == task_id))
-    return result.scalar_one_or_none()
+async def get_task_by_id(session, task_id: int):
+    res = await session.execute(select(Task).where(Task.id == task_id))
+    return res.scalar_one_or_none()
 
 
-async def take_task(session: AsyncSession, task_id: int, worker_id: int) -> None:
+async def take_task(session, task_id: int, worker_id: int):
     await session.execute(
-        update(Task)
-        .where(Task.id == task_id)
-        .values(status=TaskStatus.in_progress, taken_by_id=worker_id)
+        update(Task).where(Task.id == task_id, Task.status == TaskStatus.open).values(
+            status=TaskStatus.in_progress,
+            taken_by_id=worker_id,
+        )
     )
     await session.commit()
 
 
-async def complete_task(session: AsyncSession, task_id: int) -> None:
-    await session.execute(
-        update(Task).where(Task.id == task_id).values(status=TaskStatus.done)
-    )
+async def send_task_to_review(session, task_id: int):
+    await session.execute(update(Task).where(Task.id == task_id).values(status=TaskStatus.review))
     await session.commit()
 
 
-async def create_report(session: AsyncSession, task_id: int, worker_id: int, comment: str, photos: list[str]) -> TaskReport:
-    import json
+async def return_task_to_work(session, task_id: int):
+    await session.execute(update(Task).where(Task.id == task_id).values(status=TaskStatus.in_progress))
+    await session.commit()
+
+
+async def complete_task(session, task_id: int):
+    await session.execute(update(Task).where(Task.id == task_id).values(status=TaskStatus.done))
+    await session.commit()
+
+
+async def delete_task(session, task_id: int):
+    await session.execute(delete(Task).where(Task.id == task_id))
+    await session.commit()
+
+
+async def create_report(session, task_id: int, worker_id: int, comment: str, photos: list[str]):
+    res = await session.execute(select(TaskReport).where(TaskReport.task_id == task_id))
+    existing = res.scalar_one_or_none()
+    if existing:
+        existing.worker_id = worker_id
+        existing.comment = comment
+        existing.photos_json = json.dumps(photos)
+        await session.commit()
+        await session.refresh(existing)
+        return existing
     report = TaskReport(task_id=task_id, worker_id=worker_id, comment=comment, photos_json=json.dumps(photos))
     session.add(report)
     await session.commit()
@@ -157,21 +137,54 @@ async def create_report(session: AsyncSession, task_id: int, worker_id: int, com
     return report
 
 
-# ── Messages ───────────────────────────────────────────────────────────────
+async def get_report_by_task(session, task_id: int):
+    res = await session.execute(select(TaskReport).where(TaskReport.task_id == task_id))
+    return res.scalar_one_or_none()
 
-async def save_message(session: AsyncSession, site_id: int, user_id: int, text: str, photo_id: str | None = None) -> Message:
+
+async def create_task_review(session, task_id: int, foreman_id: int, comment: str):
+    review = TaskReview(task_id=task_id, foreman_id=foreman_id, comment=comment)
+    session.add(review)
+    await session.commit()
+    await session.refresh(review)
+    return review
+
+
+async def get_last_task_review(session, task_id: int):
+    res = await session.execute(select(TaskReview).where(TaskReview.task_id == task_id).order_by(TaskReview.created_at.desc()))
+    return res.scalars().first()
+
+
+async def get_workers_by_site(session, site_id: int):
+    res = await session.execute(
+        select(User)
+        .join(SiteMember, SiteMember.worker_id == User.id)
+        .where(SiteMember.site_id == site_id, User.role == UserRole.worker)
+    )
+    return list(res.scalars().all())
+
+
+async def get_site_worker_telegram_ids(session, site_id: int):
+    res = await session.execute(
+        select(User.telegram_id)
+        .join(SiteMember, SiteMember.worker_id == User.id)
+        .where(SiteMember.site_id == site_id, User.role == UserRole.worker)
+    )
+    return [row[0] for row in res.all()]
+
+
+async def save_message(session, site_id: int, user_id: int, text: str, photo_id: str | None = None):
     msg = Message(site_id=site_id, user_id=user_id, text=text, photo_id=photo_id)
     session.add(msg)
     await session.commit()
+    await session.refresh(msg)
     return msg
 
 
-async def get_recent_messages(session: AsyncSession, site_id: int, limit: int = 20) -> list[Message]:
-    result = await session.execute(
-        select(Message)
-        .options(selectinload(Message.sender))
-        .where(Message.site_id == site_id)
-        .order_by(Message.sent_at.desc())
-        .limit(limit)
+async def get_recent_messages(session, site_id: int, limit: int = 20):
+    res = await session.execute(
+        select(Message).where(Message.site_id == site_id).order_by(Message.sent_at.desc()).limit(limit)
     )
-    return list(reversed(result.scalars().all()))
+    messages = list(res.scalars().all())
+    messages.reverse()
+    return messages

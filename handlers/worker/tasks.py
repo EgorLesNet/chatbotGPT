@@ -9,7 +9,7 @@ import json
 from db.models import UserRole, User, TaskStatus
 from db.repo import (
     get_sites_for_worker, get_tasks_by_site, get_task_by_id,
-    take_task, complete_task, create_report, get_site_by_id
+    take_task, send_task_to_review, create_report, get_site_by_id, get_last_task_review
 )
 from keyboards.worker import kb_worker_main, kb_sites_inline, kb_task_worker, kb_tasks_inline
 from keyboards.common import kb_remove
@@ -50,13 +50,18 @@ async def worker_tasks_list(callback: CallbackQuery, session: AsyncSession, lang
 
 
 @router.callback_query(F.data.startswith("w_task:"))
-async def worker_task_detail(callback: CallbackQuery, session: AsyncSession, lang: str):
+async def worker_task_detail(callback: CallbackQuery, session: AsyncSession, bot: Bot, lang: str):
     task_id = int(callback.data.split(":")[1])
     task = await get_task_by_id(session, task_id)
     if not task:
         await callback.answer(t("task_not_found", lang), show_alert=True)
         return
-    status_key = {"open": "status_open", "in_progress": "status_in_progress", "done": "status_done"}
+    status_key = {
+        "open": "status_open",
+        "in_progress": "status_in_progress",
+        "review": "status_review",
+        "done": "status_done"
+    }
     status_str = t(status_key.get(task.status.value, "status_open"), lang)
     taken_str = ""
     if task.taken_by_id:
@@ -67,6 +72,14 @@ async def worker_task_detail(callback: CallbackQuery, session: AsyncSession, lan
         t("task_detail", lang, title=task.title, desc=task.description or "—", status=status_str) + taken_str,
         reply_markup=kb_task_worker(task.id, task.status.value, lang),
     )
+    if task.photo_id:
+        try:
+            await bot.send_photo(callback.from_user.id, task.photo_id, caption=t("task_area_photo", lang))
+        except Exception:
+            pass
+    last_review = await get_last_task_review(session, task.id)
+    if last_review and task.status == TaskStatus.in_progress:
+        await callback.message.answer(t("last_review_comment", lang, comment=last_review.comment))
     await callback.answer()
 
 
@@ -102,7 +115,7 @@ async def worker_done_task_start(callback: CallbackQuery, state: FSMContext, ses
         await callback.answer(t("task_not_found", lang), show_alert=True)
         return
     await state.update_data(task_id=task_id)
-    await callback.message.answer(t("send_photos", lang), reply_markup=kb_remove())
+    await callback.message.answer(t("send_min_3_photos", lang), reply_markup=kb_remove())
     await state.set_state(DoneTaskState.photos)
     await callback.answer()
 
@@ -126,13 +139,13 @@ async def worker_photos_done_word(message: Message, state: FSMContext, lang: str
     photos = data.get("photos", [])
     done_words = [t("done_word", l) for l in ("ru", "en", "tg", "uz")]
     if message.text and message.text.strip().lower() in done_words:
-        if not photos:
-            await message.answer(t("need_photo", lang))
+        if len(photos) < 3:
+            await message.answer(t("need_min_3_photos", lang))
             return
         await message.answer(t("enter_comment", lang), reply_markup=kb_remove())
         await state.set_state(DoneTaskState.comment)
     else:
-        await message.answer(t("send_photos", lang))
+        await message.answer(t("send_min_3_photos", lang))
 
 
 @router.message(DoneTaskState.comment)
@@ -142,7 +155,7 @@ async def worker_submit_report(message: Message, state: FSMContext, session: Asy
     task_id = data["task_id"]
     photos = data.get("photos", [])
     comment = message.text.strip() if message.text else ""
-    await complete_task(session, task_id)
+    await send_task_to_review(session, task_id)
     await create_report(session, task_id, current_user.id, comment, photos)
     task = await get_task_by_id(session, task_id)
     site = await get_site_by_id(session, task.site_id) if task else None
@@ -150,7 +163,7 @@ async def worker_submit_report(message: Message, state: FSMContext, session: Asy
     foreman = foreman_result.scalar_one_or_none()
     if foreman:
         f_lang = foreman.lang or "ru"
-        notify_text = t("report_notify", f_lang, worker=current_user.name, task=task.title if task else "", site=site.name if site else "", comment=comment)
+        notify_text = t("report_notify_review", f_lang, worker=current_user.name, task=task.title if task else "", site=site.name if site else "", comment=comment)
         try:
             await bot.send_message(foreman.telegram_id, notify_text)
         except Exception:
@@ -160,9 +173,4 @@ async def worker_submit_report(message: Message, state: FSMContext, session: Asy
                 await bot.send_photo(foreman.telegram_id, ph)
             except Exception:
                 pass
-    await message.answer(t("report_sent", lang), reply_markup=kb_worker_main(lang))
-
-
-def kb_worker_main(lang):
-    from keyboards.worker import kb_worker_main as _kb
-    return _kb(lang)
+    await message.answer(t("report_sent_review", lang), reply_markup=kb_worker_main(lang))

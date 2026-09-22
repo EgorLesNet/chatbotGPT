@@ -32,7 +32,7 @@ def kb_task_worker(task_id: int, status: str, lang: str = "ru") -> InlineKeyboar
 
 
 def kb_tasks_inline(tasks: list[Task], prefix: str = "w_task") -> InlineKeyboardMarkup:
-    status_emoji = {"open": "🔵", "in_progress": "🟡", "done": "🟢"}
+    status_emoji = {"open": "🔵", "in_progress": "🟡", "review": "🟠", "done": "🟢"}
     buttons = [
         [InlineKeyboardButton(
             text=f"{status_emoji.get(task.status.value, '⚪')} {task.title}",

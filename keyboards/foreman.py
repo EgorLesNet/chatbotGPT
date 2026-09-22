@@ -24,7 +24,7 @@ def kb_sites_inline(sites: list[Site], action: str = "f_site") -> InlineKeyboard
 
 
 def kb_tasks_inline(tasks: list[Task], prefix: str = "f_task") -> InlineKeyboardMarkup:
-    status_emoji = {"open": "🔵", "in_progress": "🟡", "done": "🟢"}
+    status_emoji = {"open": "🔵", "in_progress": "🟡", "review": "🟠", "done": "🟢"}
     buttons = [
         [InlineKeyboardButton(
             text=f"{status_emoji.get(t.status.value, '⚪')} {t.title}",
@@ -38,4 +38,11 @@ def kb_tasks_inline(tasks: list[Task], prefix: str = "f_task") -> InlineKeyboard
 def kb_task_foreman(task_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t("btn_delete_task", lang), callback_data=f"f_deltask:{task_id}")],
+    ])
+
+
+def kb_review_actions(task_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t("btn_rework", lang), callback_data=f"f_rework:{task_id}")],
+        [InlineKeyboardButton(text=t("btn_accept_review", lang), callback_data=f"f_accept:{task_id}")],
     ])
