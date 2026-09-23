@@ -3,7 +3,7 @@ from typing import Any, Awaitable, Callable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from db.base import AsyncSessionLocal
-from db.repo import get_user_by_telegram_id
+from db.repo import get_user_by_tg
 from locales.i18n import t
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class AuthMiddleware(BaseMiddleware):
                 telegram_id = event.from_user.id if event.from_user else None
 
             if telegram_id:
-                user = await get_user_by_telegram_id(session, telegram_id)
+                user = await get_user_by_tg(session, telegram_id)
                 data["current_user"] = user
                 lang = user.lang if user else "ru"
                 data["lang"] = lang

@@ -16,7 +16,7 @@ TRANSLATIONS = {
         "ru": "👋 Добро пожаловать на платформу <b>Прораб</b>!\n\nПоделитесь номером телефона для регистрации:",
         "en": "👋 Welcome to <b>Prorab</b> platform!\n\nShare your phone number to register:",
         "tg": "👋 Ба платформаи <b>Прораб</b> хуш омадед!\n\nБарои бақайдгирӣ рақами телефони худро иҷозат диҳед:",
-        "uz": "👋 <b>Prоrab</b> platformasiga xush kelibsiz!\n\nRo'yxatdan o'tish uchun telefon raqamingizni ulashing:",
+        "uz": "👋 <b>Prпab</b> platformasiga xush kelibsiz!\n\nRo'yxatdan o'tish uchun telefon raqamingizni ulashing:",
     },
     "share_phone_btn": {
         "ru": "📱 Поделиться номером",
@@ -199,10 +199,10 @@ TRANSLATIONS = {
         "uz": "Ob'ekt foto va videolarini yuboring. Tugagach — <b>tayyor</b> deb yozing. Media bo'lmasa — <b>o'tkazib yuborish</b> deb yozing.",
     },
     "video_received": {
-        "ru": "🎬 Видео {n} получено.",
-        "en": "🎬 Video {n} received.",
-        "tg": "🎬 Видеои {n} қабул шуд.",
-        "uz": "🎬 {n}-video qabul qilindi.",
+        "ru": "🎦 Видео {n} получено.",
+        "en": "🎦 Video {n} received.",
+        "tg": "🎦 Видеои {n} қабул шуд.",
+        "uz": "🎦 {n}-video qabul qilindi.",
     },
     "site_created": {
         "ru": "✅ Объект <b>{name}</b> создан!\n\n🔗 Инвайт-ссылка для рабочих:\n<code>{link}</code>",
@@ -324,6 +324,18 @@ TRANSLATIONS = {
         "tg": "🗑 Вазифаро нест кунед",
         "uz": "🗑 Vazifani o'chirish",
     },
+    "task_deleted": {
+        "ru": "🗑 Задача удалена.",
+        "en": "🗑 Task deleted.",
+        "tg": "🗑 Вазифа хариф шуд.",
+        "uz": "🗑 Vazifa o'chirildi.",
+    },
+    "action_cancelled": {
+        "ru": "❌ Действие отменено.",
+        "en": "❌ Action cancelled.",
+        "tg": "❌ Амал лашв дода шуд.",
+        "uz": "❌ Amal bekor qilindi.",
+    },
     "btn_rework": {
         "ru": "📝 Отправить на доработку",
         "en": "📝 Send for rework",
@@ -352,7 +364,7 @@ TRANSLATIONS = {
         "ru": "Отправьте фото участка для задачи. Если фото не нужно — напишите <b>пропустить</b>.",
         "en": "Send a site area photo for the task. If no photo is needed — type <b>skip</b>.",
         "tg": "Акси қитъаро барои вазифа фиристед. Агар акс лозим набошад — <b>гузаронед</b> нависед.",
-        "uz": "Vazifa учун hudud rasmini yuboring. Agar rasm kerak bo'lmasa — <b>o'tkazib yuborish</b> deb yozing.",
+        "uz": "Vazifa uchun hudud rasmini yuboring. Agar rasm kerak bo'lmasa — <b>o'tkazib yuborish</b> deb yozing.",
     },
     "task_area_photo": {
         "ru": "📸 Фото участка",
@@ -429,7 +441,7 @@ TRANSLATIONS = {
     "need_photo": {
         "ru": "Нужно хотя бы одно фото.",
         "en": "At least one photo is required.",
-        "tg": "Ҳадди аққал як акс лозим аст.",
+        "tg": "ҳадди ақал як акс лозим аст.",
         "uz": "Kamida bitta rasm kerak.",
     },
     "need_min_3_photos": {
