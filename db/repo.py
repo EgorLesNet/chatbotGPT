@@ -13,6 +13,12 @@ async def get_user_by_phone(session, phone: str):
     return res.scalar_one_or_none()
 
 
+async def get_user_lang_by_tg(session, telegram_id: int) -> str:
+    res = await session.execute(select(User.lang).where(User.telegram_id == telegram_id))
+    lang = res.scalar_one_or_none()
+    return lang or "ru"
+
+
 async def create_user(session, telegram_id: int, phone: str, name: str, role: UserRole, lang: str = "ru"):
     user = User(telegram_id=telegram_id, phone=phone, name=name, role=role, lang=lang)
     session.add(user)
@@ -151,8 +157,17 @@ async def create_task_review(session, task_id: int, foreman_id: int, comment: st
 
 
 async def get_last_task_review(session, task_id: int):
-    res = await session.execute(select(TaskReview).where(TaskReview.task_id == task_id).order_by(TaskReview.created_at.desc()))
+    res = await session.execute(
+        select(TaskReview).where(TaskReview.task_id == task_id).order_by(TaskReview.created_at.desc())
+    )
     return res.scalars().first()
+
+
+async def get_task_review_history(session, task_id: int) -> list:
+    res = await session.execute(
+        select(TaskReview).where(TaskReview.task_id == task_id).order_by(TaskReview.created_at.asc())
+    )
+    return list(res.scalars().all())
 
 
 async def get_workers_by_site(session, site_id: int):

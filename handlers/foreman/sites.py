@@ -24,6 +24,15 @@ class SiteCreateState(StatesGroup):
 
 ALL_MY_SITES = [t("btn_my_sites", l) for l in ("ru", "en", "tg", "uz")]
 ALL_CREATE_SITE = [t("btn_create_site", l) for l in ("ru", "en", "tg", "uz")]
+ALL_CANCEL = ["/cancel", "отмена", "cancel", "бекор", "бекор қилиш"]
+
+
+@router.message(F.text.in_(ALL_CANCEL))
+async def cancel_site_state(message: Message, state: FSMContext, lang: str):
+    current = await state.get_state()
+    if current and current.startswith("SiteCreateState"):
+        await state.clear()
+        await message.answer(t("action_cancelled", lang), reply_markup=kb_foreman_main(lang))
 
 
 @router.message(F.text.in_(ALL_MY_SITES))

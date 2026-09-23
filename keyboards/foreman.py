@@ -24,13 +24,14 @@ def kb_sites_inline(sites: list[Site], action: str = "f_site") -> InlineKeyboard
 
 
 def kb_tasks_inline(tasks: list[Task], prefix: str = "f_task") -> InlineKeyboardMarkup:
+    # Fix: renamed loop var from `t` to `task` to avoid shadowing the i18n function t()
     status_emoji = {"open": "🔵", "in_progress": "🟡", "review": "🟠", "done": "🟢"}
     buttons = [
         [InlineKeyboardButton(
-            text=f"{status_emoji.get(t.status.value, '⚪')} {t.title}",
-            callback_data=f"{prefix}:{t.id}"
+            text=f"{status_emoji.get(task.status.value, '⚪')} {task.title}",
+            callback_data=f"{prefix}:{task.id}"
         )]
-        for t in tasks
+        for task in tasks
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

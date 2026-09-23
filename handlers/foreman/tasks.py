@@ -10,7 +10,8 @@ from db.models import UserRole, User, TaskReport, TaskStatus
 from db.repo import (
     get_sites_by_foreman, create_task, get_tasks_by_site,
     get_task_by_id, get_site_by_id, get_site_worker_telegram_ids,
-    get_report_by_task, create_task_review, return_task_to_work, complete_task
+    get_report_by_task, create_task_review, return_task_to_work, complete_task,
+    delete_task, get_user_lang_by_tg
 )
 from keyboards.foreman import kb_foreman_main, kb_sites_inline, kb_tasks_inline, kb_task_foreman, kb_review_actions
 from keyboards.common import kb_remove
@@ -32,6 +33,15 @@ class ReviewCommentState(StatesGroup):
 
 ALL_TASKS_BTN = [t("btn_tasks", l) for l in ("ru", "en", "tg", "uz")]
 ALL_CREATE_TASK_BTN = [t("btn_create_task", l) for l in ("ru", "en", "tg", "uz")]
+ALL_CANCEL = ["/cancel", "отмена", "cancel", "бекор", "бекор қилиш"]
+
+
+@router.message(F.text.in_(ALL_CANCEL))
+async def cancel_any_state(message: Message, state: FSMContext, lang: str):
+    current = await state.get_state()
+    if current:
+        await state.clear()
+        await message.answer(t("action_cancelled", lang), reply_markup=kb_foreman_main(lang))
 
 
 @router.message(F.text.in_(ALL_TASKS_BTN))
@@ -49,8 +59,8 @@ async def foreman_tasks_menu(message: Message, session: AsyncSession, current_us
 async def foreman_tasks_list(callback: CallbackQuery, session: AsyncSession, lang: str):
     site_id = int(callback.data.split(":")[1])
     tasks = await get_tasks_by_site(session, site_id)
-    active = [t_ for t_ in tasks if t_.status.value != "done"]
-    done_count = len([t_ for t_ in tasks if t_.status.value == "done"])
+    active = [task for task in tasks if task.status.value != "done"]
+    done_count = len([task for task in tasks if task.status.value == "done"])
 
     kb = kb_tasks_inline(active) if active else None
     archive_btn = InlineKeyboardButton(
@@ -71,13 +81,13 @@ async def foreman_tasks_list(callback: CallbackQuery, session: AsyncSession, lan
 async def foreman_archive_list(callback: CallbackQuery, session: AsyncSession, lang: str):
     site_id = int(callback.data.split(":")[1])
     tasks = await get_tasks_by_site(session, site_id)
-    done_tasks = [t_ for t_ in tasks if t_.status.value == "done"]
+    done_tasks = [task for task in tasks if task.status.value == "done"]
     if not done_tasks:
         await callback.answer(t("no_done_tasks", lang), show_alert=True)
         return
     buttons = [
-        [InlineKeyboardButton(text=f"🟢 {t_.title}", callback_data=f"f_arch_task:{t_.id}")]
-        for t_ in done_tasks
+        [InlineKeyboardButton(text=f"🟢 {task.title}", callback_data=f"f_arch_task:{task.id}")]
+        for task in done_tasks
     ]
     buttons.append([InlineKeyboardButton(text=t("back_btn", lang), callback_data=f"f_tasks:{site_id}")])
     await callback.message.edit_text(
@@ -165,6 +175,18 @@ async def foreman_task_detail(callback: CallbackQuery, session: AsyncSession, bo
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("f_deltask:"))
+async def foreman_delete_task(callback: CallbackQuery, session: AsyncSession, lang: str):
+    task_id = int(callback.data.split(":")[1])
+    task = await get_task_by_id(session, task_id)
+    if not task:
+        await callback.answer(t("task_not_found", lang), show_alert=True)
+        return
+    await delete_task(session, task_id)
+    await callback.message.edit_text(t("task_deleted", lang))
+    await callback.answer()
+
+
 @router.message(F.text.in_(ALL_CREATE_TASK_BTN))
 async def foreman_create_task_start(message: Message, state: FSMContext, session: AsyncSession, current_user, lang: str):
     if not current_user or current_user.role != UserRole.foreman:
@@ -209,7 +231,7 @@ async def foreman_task_photo(message: Message, state: FSMContext, session: Async
     worker_tg_ids = await get_site_worker_telegram_ids(session, data["site_id"])
     site = await get_site_by_id(session, data["site_id"])
     for tg_id in worker_tg_ids:
-        w_lang = await get_worker_lang_by_tg(session, tg_id)
+        w_lang = await get_user_lang_by_tg(session, tg_id)
         try:
             await bot.send_message(tg_id, t("new_task_notify", w_lang, site=site.name if site else "", title=task.title, desc=task.description))
             await bot.send_photo(tg_id, task.photo_id, caption=t("task_area_photo", w_lang))
@@ -230,7 +252,7 @@ async def foreman_task_photo_skip(message: Message, state: FSMContext, session: 
     worker_tg_ids = await get_site_worker_telegram_ids(session, data["site_id"])
     site = await get_site_by_id(session, data["site_id"])
     for tg_id in worker_tg_ids:
-        w_lang = await get_worker_lang_by_tg(session, tg_id)
+        w_lang = await get_user_lang_by_tg(session, tg_id)
         try:
             await bot.send_message(tg_id, t("new_task_notify", w_lang, site=site.name if site else "", title=task.title, desc=task.description))
         except Exception:
@@ -288,11 +310,3 @@ async def foreman_accept_task(callback: CallbackQuery, session: AsyncSession, bo
                 pass
     await callback.message.answer(t("task_review_accepted", lang))
     await callback.answer()
-
-
-async def get_worker_lang_by_tg(session, tg_id: int) -> str:
-    from sqlalchemy import select as sa_select
-    from db.models import User as U
-    res = await session.execute(sa_select(U.lang).where(U.telegram_id == tg_id))
-    lang = res.scalar_one_or_none()
-    return lang or "ru"
