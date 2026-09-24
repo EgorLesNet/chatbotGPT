@@ -19,6 +19,16 @@ async def get_user_lang_by_tg(session, telegram_id: int) -> str:
     return lang or "ru"
 
 
+async def set_user_lang(session, user_id: int, lang: str):
+    await session.execute(update(User).where(User.id == user_id).values(lang=lang))
+    await session.commit()
+
+
+async def set_user_notifications(session, user_id: int, value: bool):
+    await session.execute(update(User).where(User.id == user_id).values(notifications=value))
+    await session.commit()
+
+
 async def create_user(session, telegram_id: int, phone: str, name: str, role: UserRole, lang: str = "ru"):
     user = User(telegram_id=telegram_id, phone=phone, name=name, role=role, lang=lang)
     session.add(user)
@@ -54,11 +64,19 @@ async def add_worker_to_site(session, site_id: int, worker_id: int):
     return member
 
 
+# aliases used in handlers/foreman/workers.py
+add_member = add_worker_to_site
+
+
 async def is_worker_on_site(session, site_id: int, worker_id: int) -> bool:
     res = await session.execute(
         select(SiteMember).where(SiteMember.site_id == site_id, SiteMember.worker_id == worker_id)
     )
     return res.scalar_one_or_none() is not None
+
+
+# alias used in handlers/foreman/workers.py
+is_member = is_worker_on_site
 
 
 async def get_sites_by_foreman(session, foreman_id: int):
@@ -75,6 +93,13 @@ async def get_sites_for_worker(session, worker_id: int):
 
 async def get_site_by_id(session, site_id: int):
     res = await session.execute(select(Site).where(Site.id == site_id))
+    return res.scalar_one_or_none()
+
+
+async def get_foreman_by_site(session, site_id: int):
+    res = await session.execute(
+        select(User).join(Site, Site.foreman_id == User.id).where(Site.id == site_id)
+    )
     return res.scalar_one_or_none()
 
 
