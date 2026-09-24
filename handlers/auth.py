@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserRole
-from db.repo import get_user_by_phone, create_user, set_user_lang
+from db.repo import get_user_by_phone, create_user
 from keyboards.common import kb_phone, kb_role, kb_remove
 from keyboards.foreman import kb_foreman_main
 from keyboards.worker import kb_worker_main
@@ -24,6 +24,7 @@ class RegState(StatesGroup):
 
 @router.message(F.text == "/start")
 async def cmd_start(message: Message, state: FSMContext, current_user, lang: str):
+    await state.clear()
     if current_user:
         if current_user.role == UserRole.foreman:
             await message.answer(t("welcome_back", lang, name=current_user.name), reply_markup=kb_foreman_main(lang))
@@ -35,14 +36,14 @@ async def cmd_start(message: Message, state: FSMContext, current_user, lang: str
 
 
 @router.callback_query(F.data.startswith("set_lang:"), RegState.lang)
-async def pick_lang(callback: CallbackQuery, state: FSMContext):
+async def pick_lang(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     lang = callback.data.split(":")[1]
     if lang not in LANGUAGES:
         await callback.answer()
         return
     await state.update_data(lang=lang)
     await callback.message.edit_text(t("welcome", lang))
-    await callback.message.answer(t("welcome", lang), reply_markup=kb_phone(lang))
+    await callback.message.answer(t("share_phone_btn", lang), reply_markup=kb_phone(lang))
     await state.set_state(RegState.phone)
     await callback.answer()
 
