@@ -2,6 +2,14 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from db.models import Site, Task
 from locales.i18n import t
 
+BACK_BTN = {"ru": "⬅️ Назад", "en": "⬅️ Back", "tg": "⬅️ Бозгашт", "uz": "⬅️ Orqaga"}
+
+
+def kb_back(lang: str = "ru", cb: str = "back") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data=cb)]
+    ])
+
 
 def kb_foreman_main(lang: str = "ru") -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
@@ -15,16 +23,16 @@ def kb_foreman_main(lang: str = "ru") -> ReplyKeyboardMarkup:
     )
 
 
-def kb_sites_inline(sites: list[Site], action: str = "f_site") -> InlineKeyboardMarkup:
+def kb_sites_inline(sites: list[Site], action: str = "f_site", lang: str = "ru") -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text=f"🏗 {s.name}", callback_data=f"{action}:{s.id}")]
         for s in sites
     ]
+    buttons.append([InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def kb_tasks_inline(tasks: list[Task], prefix: str = "f_task") -> InlineKeyboardMarkup:
-    # Fix: renamed loop var from `t` to `task` to avoid shadowing the i18n function t()
+def kb_tasks_inline(tasks: list[Task], prefix: str = "f_task", lang: str = "ru") -> InlineKeyboardMarkup:
     status_emoji = {"open": "🔵", "in_progress": "🟡", "review": "🟠", "done": "🟢"}
     buttons = [
         [InlineKeyboardButton(
@@ -33,12 +41,14 @@ def kb_tasks_inline(tasks: list[Task], prefix: str = "f_task") -> InlineKeyboard
         )]
         for task in tasks
     ]
+    buttons.append([InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def kb_task_foreman(task_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t("btn_delete_task", lang), callback_data=f"f_deltask:{task_id}")],
+        [InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data="back")],
     ])
 
 
@@ -46,4 +56,5 @@ def kb_review_actions(task_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t("btn_rework", lang), callback_data=f"f_rework:{task_id}")],
         [InlineKeyboardButton(text=t("btn_accept_review", lang), callback_data=f"f_accept:{task_id}")],
+        [InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data="back")],
     ])

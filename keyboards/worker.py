@@ -2,6 +2,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from db.models import Site, Task
 from locales.i18n import t
 
+BACK_BTN = {"ru": "⬅️ Назад", "en": "⬅️ Back", "tg": "⬅️ Бозгашт", "uz": "⬅️ Orqaga"}
+
 
 def kb_worker_main(lang: str = "ru") -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
@@ -14,11 +16,12 @@ def kb_worker_main(lang: str = "ru") -> ReplyKeyboardMarkup:
     )
 
 
-def kb_sites_inline(sites: list[Site], action: str = "w_site") -> InlineKeyboardMarkup:
+def kb_sites_inline(sites: list[Site], action: str = "w_site", lang: str = "ru") -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text=f"🏗 {s.name}", callback_data=f"{action}:{s.id}")]
         for s in sites
     ]
+    buttons.append([InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -28,10 +31,11 @@ def kb_task_worker(task_id: int, status: str, lang: str = "ru") -> InlineKeyboar
         buttons.append([InlineKeyboardButton(text=t("btn_take_task", lang), callback_data=f"w_take:{task_id}")])
     elif status == "in_progress":
         buttons.append([InlineKeyboardButton(text=t("btn_done_task", lang), callback_data=f"w_done:{task_id}")])
+    buttons.append([InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def kb_tasks_inline(tasks: list[Task], prefix: str = "w_task") -> InlineKeyboardMarkup:
+def kb_tasks_inline(tasks: list[Task], prefix: str = "w_task", lang: str = "ru") -> InlineKeyboardMarkup:
     status_emoji = {"open": "🔵", "in_progress": "🟡", "review": "🟠", "done": "🟢"}
     buttons = [
         [InlineKeyboardButton(
@@ -40,4 +44,5 @@ def kb_tasks_inline(tasks: list[Task], prefix: str = "w_task") -> InlineKeyboard
         )]
         for task in tasks
     ]
+    buttons.append([InlineKeyboardButton(text=BACK_BTN.get(lang, "⬅️ Назад"), callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
