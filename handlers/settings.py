@@ -27,30 +27,38 @@ ALL_SETTINGS_LABELS = [label for labels in SETTINGS_TEXTS.values() for label in 
 
 
 @router.message(F.text.in_(ALL_SETTINGS_LABELS))
-async def settings_handler(message: Message, user: User):
+async def settings_handler(message: Message, current_user: User, lang: str):
+    if not current_user:
+        return
     await message.answer(
-        t("settings_title", user.lang),
-        reply_markup=kb_settings(user.lang, user.notifications),
+        t("settings_title", lang),
+        reply_markup=kb_settings(current_user.lang, current_user.notifications),
     )
 
 
 @router.callback_query(F.data == "stg_lang")
-async def toggle_lang(call: CallbackQuery, user: User, session: AsyncSession):
+async def toggle_lang(call: CallbackQuery, current_user: User, session: AsyncSession):
+    if not current_user:
+        await call.answer()
+        return
     langs = ["ru", "en", "tg", "uz"]
-    current_idx = langs.index(user.lang) if user.lang in langs else 0
+    current_idx = langs.index(current_user.lang) if current_user.lang in langs else 0
     new_lang = langs[(current_idx + 1) % len(langs)]
-    await session.execute(update(User).where(User.id == user.id).values(lang=new_lang))
+    await session.execute(update(User).where(User.id == current_user.id).values(lang=new_lang))
     await session.commit()
-    user.lang = new_lang
-    await call.message.edit_reply_markup(reply_markup=kb_settings(new_lang, user.notifications))
+    current_user.lang = new_lang
+    await call.message.edit_reply_markup(reply_markup=kb_settings(new_lang, current_user.notifications))
     await call.answer()
 
 
 @router.callback_query(F.data == "stg_notif")
-async def toggle_notif(call: CallbackQuery, user: User, session: AsyncSession):
-    new_val = not user.notifications
-    await session.execute(update(User).where(User.id == user.id).values(notifications=new_val))
+async def toggle_notif(call: CallbackQuery, current_user: User, session: AsyncSession):
+    if not current_user:
+        await call.answer()
+        return
+    new_val = not current_user.notifications
+    await session.execute(update(User).where(User.id == current_user.id).values(notifications=new_val))
     await session.commit()
-    user.notifications = new_val
-    await call.message.edit_reply_markup(reply_markup=kb_settings(user.lang, new_val))
+    current_user.notifications = new_val
+    await call.message.edit_reply_markup(reply_markup=kb_settings(current_user.lang, new_val))
     await call.answer()
