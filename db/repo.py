@@ -8,6 +8,10 @@ async def get_user_by_tg(session, telegram_id: int):
     return res.scalar_one_or_none()
 
 
+# alias used in handlers/worker/sites.py
+get_user_by_telegram_id = get_user_by_tg
+
+
 async def get_user_by_phone(session, phone: str):
     res = await session.execute(select(User).where(User.phone == phone))
     return res.scalar_one_or_none()
@@ -57,6 +61,10 @@ async def get_site_by_invite(session, invite_code: str):
     return res.scalar_one_or_none()
 
 
+# alias used in handlers/worker/sites.py
+get_site_by_invite_code = get_site_by_invite
+
+
 async def add_worker_to_site(session, site_id: int, worker_id: int):
     member = SiteMember(site_id=site_id, worker_id=worker_id)
     session.add(member)
@@ -64,7 +72,7 @@ async def add_worker_to_site(session, site_id: int, worker_id: int):
     return member
 
 
-# aliases used in handlers/foreman/workers.py
+# alias used in handlers/foreman/workers.py
 add_member = add_worker_to_site
 
 
@@ -107,14 +115,12 @@ async def get_all_site_participant_telegram_ids(session, site) -> list[int]:
     """Returns telegram_ids of foreman + all workers on the site."""
     if site is None:
         return []
-    # workers
     res = await session.execute(
         select(User.telegram_id)
         .join(SiteMember, SiteMember.worker_id == User.id)
         .where(SiteMember.site_id == site.id)
     )
     ids = [row[0] for row in res.all()]
-    # foreman
     foreman = await session.execute(select(User.telegram_id).where(User.id == site.foreman_id))
     foreman_tg = foreman.scalar_one_or_none()
     if foreman_tg and foreman_tg not in ids:
