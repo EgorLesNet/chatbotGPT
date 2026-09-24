@@ -103,6 +103,25 @@ async def get_foreman_by_site(session, site_id: int):
     return res.scalar_one_or_none()
 
 
+async def get_all_site_participant_telegram_ids(session, site) -> list[int]:
+    """Returns telegram_ids of foreman + all workers on the site."""
+    if site is None:
+        return []
+    # workers
+    res = await session.execute(
+        select(User.telegram_id)
+        .join(SiteMember, SiteMember.worker_id == User.id)
+        .where(SiteMember.site_id == site.id)
+    )
+    ids = [row[0] for row in res.all()]
+    # foreman
+    foreman = await session.execute(select(User.telegram_id).where(User.id == site.foreman_id))
+    foreman_tg = foreman.scalar_one_or_none()
+    if foreman_tg and foreman_tg not in ids:
+        ids.append(foreman_tg)
+    return ids
+
+
 async def create_task(session, site_id: int, title: str, description: str, created_by: int, photo_id: str | None = None):
     task = Task(site_id=site_id, title=title, description=description, created_by=created_by, photo_id=photo_id)
     session.add(task)
