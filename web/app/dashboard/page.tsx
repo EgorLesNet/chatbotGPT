@@ -1,15 +1,9 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/profile";
 import SignOut from "./sign-out";
 
 export default async function DashboardPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase.from("users").select("name, role").eq("auth_id", user.id).maybeSingle();
-  if (!profile) redirect("/onboarding");
+  const { profile } = await getProfile();
 
   return (
     <main className="container">
@@ -19,6 +13,7 @@ export default async function DashboardPage() {
         <p className="muted">Роль: {profile.role === "foreman" ? "прораб" : "рабочий"}</p>
         <div className="grid">
           <Link className="tile" href="/sites">Объекты</Link>
+          <Link className="tile" href="/tasks">Задачи</Link>
         </div>
         <SignOut />
       </section>
