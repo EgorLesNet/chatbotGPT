@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/next-path";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,19 +16,28 @@ export default function LoginPage() {
     setLoading(true);
     setMessage("");
     const supabase = createClient();
-    const result = mode === "login"
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
-    setLoading(false);
-    if (result.error) {
-      setMessage(result.error.message);
-      return;
-    }
+    const next = safeNext(new URLSearchParams(window.location.search).get("next")) ?? "/dashboard";
     if (mode === "register") {
-      setMessage("Аккаунт создан. Подтвердите email, если это включено в Supabase.");
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      setLoading(false);
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+      if (data.session) {
+        window.location.assign(next);
+      } else {
+        setMessage("Аккаунт создан. Подтвердите email по письму и затем войдите.");
+      }
       return;
     }
-    window.location.assign("/dashboard");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    window.location.assign(next);
   }
 
   return (

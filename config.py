@@ -5,6 +5,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://heqakfypghrjeihrvbjz.supabase.co")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "").rstrip("/")
 
 
 def _normalize_db_url(url: str) -> str:
@@ -13,7 +14,6 @@ def _normalize_db_url(url: str) -> str:
         url = "postgresql://" + url[len("postgres://"):]
     if url.startswith("postgresql://"):
         url = "postgresql+asyncpg://" + url[len("postgresql://"):]
-    # asyncpg does not understand libpq query params like sslmode
     if url.startswith("postgresql+asyncpg://") and "?" in url:
         url = url.split("?", 1)[0]
     return url
