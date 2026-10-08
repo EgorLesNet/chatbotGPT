@@ -1,22 +1,23 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
-from config import DATABASE_URL, IS_POSTGRES
+from sqlalchemy.pool import NullPool
+from config import DATABASE_URL, IS_POSTGRES, SERVERLESS
 
 if IS_POSTGRES:
-    # Supabase: SSL required; statement cache must be off for pgbouncer (pooler)
-    engine = create_async_engine(
-        DATABASE_URL,
-        echo=False,
-        pool_size=5,
-        max_overflow=5,
-        pool_pre_ping=True,
-        pool_recycle=1800,
-        connect_args={
+    _kwargs: dict = {
+        "echo": False,
+        "connect_args": {
             "ssl": "require",
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0,
         },
-    )
+    }
+    if SERVERLESS:
+        # Serverless: no client-side pool, Supabase transaction pooler (port 6543) does the pooling
+        _kwargs["poolclass"] = NullPool
+    else:
+        _kwargs.update(pool_size=5, max_overflow=5, pool_pre_ping=True, pool_recycle=1800)
+    engine = create_async_engine(DATABASE_URL, **_kwargs)
 else:
     engine = create_async_engine(DATABASE_URL, echo=False)
 
@@ -28,8 +29,9 @@ class Base(DeclarativeBase):
 
 
 async def init_db():
+    if SERVERLESS:
+        return  # schema is managed in Supabase (supabase_schema.sql)
     from db import models  # noqa: F401
-    # On Supabase the schema is managed by supabase_schema.sql; create_all only fills gaps.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

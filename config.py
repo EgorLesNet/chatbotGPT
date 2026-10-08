@@ -6,6 +6,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://heqakfypghrjeihrvbjz.supabase.co")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "").rstrip("/")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+SERVERLESS = bool(os.getenv("VERCEL"))
 
 
 def _normalize_db_url(url: str) -> str:
