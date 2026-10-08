@@ -1,0 +1,9 @@
+{
+  "name": "Прораб",
+  "short_name": "Прораб",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "description": "Управление строительными объектами и задачами"
+}
