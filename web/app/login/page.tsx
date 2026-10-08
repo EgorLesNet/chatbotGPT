@@ -1,8 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/next-path";
+
+function nextPath(): string {
+  return safeNext(new URLSearchParams(window.location.search).get("next")) ?? "/dashboard";
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,12 +15,18 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // The browser client refreshes an expired token itself; if a session exists, continue.
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      if (data.session) window.location.assign(nextPath());
+    });
+  }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setMessage("");
     const supabase = createClient();
-    const next = safeNext(new URLSearchParams(window.location.search).get("next")) ?? "/dashboard";
     if (mode === "register") {
       const { data, error } = await supabase.auth.signUp({ email, password });
       setLoading(false);
@@ -25,7 +35,7 @@ export default function LoginPage() {
         return;
       }
       if (data.session) {
-        window.location.assign(next);
+        window.location.assign(nextPath());
       } else {
         setMessage("Аккаунт создан. Подтвердите email по письму и затем войдите.");
       }
@@ -37,7 +47,7 @@ export default function LoginPage() {
       setMessage(error.message);
       return;
     }
-    window.location.assign(next);
+    window.location.assign(nextPath());
   }
 
   return (
