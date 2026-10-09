@@ -5,23 +5,24 @@ type SiteRow = { id: number; name: string; address: string };
 
 export default async function SitesPage() {
   const { supabase, profile } = await getProfile();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("sites")
     .select("id, name, address")
     .order("created_at", { ascending: false });
   const sites = (data ?? []) as unknown as SiteRow[];
+  const isForeman = profile.role === "foreman";
 
   return (
     <main className="container">
       <section className="card">
         <Link className="link-button" href="/dashboard">← Назад</Link>
         <h1>Объекты</h1>
-        {profile.role === "foreman" && (
-          <Link className="button" href="/sites/new">+ Создать объект</Link>
-        )}
-        {!sites.length && (
+        <p className="muted">Профиль: {profile.name} (id {profile.id}), роль: {isForeman ? "прораб" : "рабочий"}</p>
+        {isForeman && <Link className="button" href="/sites/new">+ Создать объект</Link>}
+        {error && <p className="notice">Ошибка загрузки объектов: {error.message}</p>}
+        {!error && !sites.length && (
           <p className="muted">
-            {profile.role === "foreman" ? "Объектов пока нет." : "Нет доступных объектов. Откройте ссылку-приглашение от прораба."}
+            {isForeman ? "Объектов пока нет." : "Нет доступных объектов. Откройте ссылку-приглашение от прораба."}
           </p>
         )}
         <div className="list">
