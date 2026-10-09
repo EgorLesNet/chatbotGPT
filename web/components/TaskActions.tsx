@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { explain } from "@/lib/errors";
+import { callRpc } from "@/lib/rpc";
 
 type Props = {
   taskId: number;
@@ -28,10 +27,10 @@ export default function TaskActions({
   async function call(fn: string, args: Record<string, unknown>, after?: () => void) {
     setBusy(true);
     setError("");
-    const { error } = await createClient().rpc(fn, args);
+    const err = await callRpc(fn, args);
     setBusy(false);
-    if (error) {
-      setError(explain(error.message));
+    if (err) {
+      setError(err);
       return;
     }
     setComment("");
