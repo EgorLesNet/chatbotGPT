@@ -17,6 +17,11 @@ const MAP: Record<string, string> = {
   "role locked foreman": "Нельзя стать рабочим: у вас есть созданные объекты. Удалите их или оставьте роль прораба.",
   "role locked worker": "Нельзя стать прорабом: вы состоите в объектах или у вас есть задачи. Сначала покиньте объекты.",
   "bad avatar path": "Неверный путь к аватарке. Повторите загрузку.",
+  "message required": "Введите сообщение.",
+  "message too long": "Сообщение слишком длинное (до 2000 символов).",
+  "task not in site": "Задача не относится к этому объекту.",
+  "bad kind": "Неверный тип сообщения.",
+  "telegram already connected": "Telegram уже подключён.",
 };
 
 export function explain(message: string): string {

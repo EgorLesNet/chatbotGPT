@@ -62,7 +62,10 @@ export default async function SitesPage() {
                       <span className="muted">{STATUS_LABEL[t.status] ?? t.status}</span>
                     </Link>
                   ))}
-                  <Link className="button small" href={`/sites/${s.id}`}>Открыть объект</Link>
+                  <div className="row-actions">
+                    <Link className="button small" href={`/sites/${s.id}`}>Открыть объект</Link>
+                    <Link className="button small secondary" href={`/sites/${s.id}/chat`}>💬 Чат объекта</Link>
+                  </div>
                 </div>
               </details>
             );

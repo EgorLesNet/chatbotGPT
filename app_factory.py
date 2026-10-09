@@ -6,6 +6,7 @@ from aiogram.fsm.storage.base import BaseStorage
 from config import BOT_TOKEN
 from handlers.common_back import router as back_router
 from handlers.link import router as link_router
+from handlers.connect import router as connect_router
 from handlers.auth import router as auth_router
 from handlers.settings import router as settings_router
 from handlers.foreman.sites import router as f_sites_router
@@ -30,6 +31,7 @@ def build_dispatcher(storage: BaseStorage) -> Dispatcher:
     dp.include_routers(
         back_router,
         link_router,
+        connect_router,
         auth_router,
         settings_router,
         f_sites_router,

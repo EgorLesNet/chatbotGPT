@@ -2,13 +2,15 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { explain } from "@/lib/errors";
+import { KIND_LABEL } from "@/lib/chat";
+import type { ChatMessage } from "@/lib/chat";
 
 const ALLOWED = new Set([
   "create_site", "update_site", "regenerate_invite", "delete_site", "remove_member",
   "create_task", "update_task", "assign_task", "take_task", "submit_task",
   "review_task", "release_task", "reopen_task", "delete_task",
   "create_pwa_profile", "link_telegram_account", "join_site",
-  "update_my_profile",
+  "update_my_profile", "create_telegram_connect_code", "set_notifications",
 ]);
 
 const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
@@ -96,5 +98,89 @@ export async function removeAvatar(): Promise<{ error: string | null }> {
   const { error } = await supabase.rpc("set_avatar", { p_path: null });
   if (error) return { error: explain(error.message) };
   if (old) await supabase.storage.from("avatars").remove([old]);
+  return { error: null };
+}
+
+export async function loadChat(
+  siteId: number,
+  afterId: number,
+): Promise<{ messages: ChatMessage[]; error: string | null }> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { messages: [], error: explain("not authenticated") };
+
+  const { data, error } = await supabase.rpc("get_chat", { p_site: siteId, p_after: afterId });
+  if (error) return { messages: [], error: explain(error.message) };
+  return { messages: (data ?? []) as unknown as ChatMessage[], error: null };
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+type NotifyTarget = {
+  chat_id: number;
+  site_name: string;
+  author: string;
+  body: string;
+  kind: string;
+  task_title: string | null;
+};
+
+async function notifyTelegram(
+  supabase: ReturnType<typeof createClient>,
+  messageId: number,
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+
+  const { data } = await supabase.rpc("chat_notify_targets", { p_message: messageId });
+  const targets = (data ?? []) as unknown as NotifyTarget[];
+
+  await Promise.allSettled(
+    targets.map((t) => {
+      const lines = [`💬 <b>${escapeHtml(t.site_name)}</b>`];
+      if (KIND_LABEL[t.kind]) lines.push(KIND_LABEL[t.kind]);
+      lines.push(`<b>${escapeHtml(t.author)}:</b> ${escapeHtml(t.body)}`);
+      if (t.task_title) lines.push(`📎 Задача: ${escapeHtml(t.task_title)}`);
+
+      return fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: t.chat_id,
+          text: lines.join("\n"),
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        }),
+        signal: AbortSignal.timeout(4000),
+      });
+    }),
+  );
+}
+
+export async function sendChat(input: {
+  siteId: number;
+  text: string;
+  kind: string;
+  taskId: number | null;
+}): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: explain("not authenticated") };
+
+  const { data, error } = await supabase.rpc("send_chat_message", {
+    p_site: input.siteId,
+    p_text: input.text,
+    p_kind: input.kind,
+    p_task: input.taskId,
+  });
+  if (error) return { error: explain(error.message) };
+
+  try {
+    await notifyTelegram(supabase, Number(data));
+  } catch {
+    // The message is saved; a failed Telegram notification must not break sending.
+  }
   return { error: null };
 }
