@@ -4,6 +4,8 @@ import { getProfile } from "@/lib/profile";
 import { STATUS_LABEL } from "@/lib/status";
 import CopyLink from "@/components/CopyLink";
 import NewTaskForm from "@/components/NewTaskForm";
+import SiteManage from "@/components/SiteManage";
+import RemoveMember from "@/components/RemoveMember";
 
 type SiteRow = { id: number; name: string; address: string; foreman_id: number; invite_code: string };
 type TaskRow = { id: number; title: string; status: string };
@@ -47,6 +49,7 @@ export default async function SitePage({ params }: { params: { id: string } }) {
           <>
             <h2>Приглашение для рабочих</h2>
             <CopyLink path={`/join/${site.invite_code}`} />
+            <SiteManage siteId={site.id} name={site.name} address={site.address} />
           </>
         )}
 
@@ -54,7 +57,10 @@ export default async function SitePage({ params }: { params: { id: string } }) {
         {!members.length && <p className="muted">Пока никто не присоединился.</p>}
         <div className="list">
           {members.map((m) => (
-            <div key={m.worker_id} className="row"><b>👷 {m.users?.name ?? "Без имени"}</b></div>
+            <div key={m.worker_id} className="row row-flex">
+              <b>👷 {m.users?.name ?? "Без имени"}</b>
+              {isForeman && <RemoveMember siteId={site.id} workerId={m.worker_id} name={m.users?.name ?? "рабочего"} />}
+            </div>
           ))}
         </div>
 

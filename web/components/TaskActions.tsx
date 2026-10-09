@@ -12,9 +12,14 @@ type Props = {
   canSubmit: boolean;
   canReview: boolean;
   canDelete: boolean;
+  canRelease: boolean;
+  releaseLabel: string;
+  canReopen: boolean;
 };
 
-export default function TaskActions({ taskId, siteId, canTake, canSubmit, canReview, canDelete }: Props) {
+export default function TaskActions({
+  taskId, siteId, canTake, canSubmit, canReview, canDelete, canRelease, releaseLabel, canReopen,
+}: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,7 +39,7 @@ export default function TaskActions({ taskId, siteId, canTake, canSubmit, canRev
     else router.refresh();
   }
 
-  if (!canTake && !canSubmit && !canReview && !canDelete) return null;
+  if (!canTake && !canSubmit && !canReview && !canDelete && !canRelease && !canReopen) return null;
 
   return (
     <div className="actions">
@@ -66,6 +71,18 @@ export default function TaskActions({ taskId, siteId, canTake, canSubmit, canRev
             На доработку
           </button>
         </div>
+      )}
+
+      {canRelease && (
+        <button className="button secondary" disabled={busy} onClick={() => call("release_task", { p_task_id: taskId })}>
+          {releaseLabel}
+        </button>
+      )}
+
+      {canReopen && (
+        <button className="button secondary" disabled={busy} onClick={() => call("reopen_task", { p_task_id: taskId })}>
+          Вернуть в работу
+        </button>
       )}
 
       {canDelete && (

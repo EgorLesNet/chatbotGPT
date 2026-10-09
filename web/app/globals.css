@@ -19,6 +19,7 @@ textarea { resize: vertical; }
 .button:disabled { opacity: .65; cursor: default; }
 .button.secondary { background: #f59e0b; }
 .button.danger { background: #dc2626; }
+.button.small { padding: 8px 12px; font-size: 14px; }
 .link-button { margin: 0 0 8px; border: 0; background: none; color: #2563eb; padding: 0; font: inherit; cursor: pointer; display: inline-block; }
 .notice { padding: 12px; border-radius: 10px; background: #eff6ff; color: #1d4ed8; }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 24px; }
@@ -28,6 +29,7 @@ textarea { resize: vertical; }
 .tab.active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; font-weight: 700; }
 .list { display: grid; gap: 10px; }
 .row { display: grid; gap: 4px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; }
+.row-flex { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 a.row:hover { background: #f8fafc; }
 .badge { display: inline-block; padding: 6px 12px; border-radius: 999px; background: #f1f5f9; font-weight: 700; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 16px; }
@@ -36,3 +38,5 @@ a.row:hover { background: #f8fafc; }
 .actions { display: grid; gap: 12px; margin-top: 20px; }
 .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .invite { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+details.manage { margin-top: 20px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; }
+details.manage summary { cursor: pointer; font-weight: 700; }

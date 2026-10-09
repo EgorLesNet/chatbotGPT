@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getProfile } from "@/lib/profile";
 import { STATUS_LABEL } from "@/lib/status";
 import TaskActions from "@/components/TaskActions";
+import TaskEditor from "@/components/TaskEditor";
+import AssignTask from "@/components/AssignTask";
 
 type TaskRow = {
   id: number; site_id: number; title: string; description: string;
@@ -10,6 +12,7 @@ type TaskRow = {
 };
 type SiteRow = { id: number; name: string; foreman_id: number };
 type NoteRow = { id: number; comment: string; created_at: string };
+type MemberRow = { worker_id: number; users: { name: string } | null };
 
 function fmt(value: string): string {
   return new Date(value).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
@@ -59,9 +62,26 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
 
   const isForeman = profile.role === "foreman" && site?.foreman_id === profile.id;
   const isWorker = profile.role === "worker";
+  const isMine = task.taken_by_id === profile.id;
+
+  let workers: { id: number; name: string }[] = [];
+  if (isForeman) {
+    const { data: memberData } = await supabase
+      .from("site_members")
+      .select("worker_id, users(name)")
+      .eq("site_id", task.site_id);
+    workers = ((memberData ?? []) as unknown as MemberRow[]).map((m) => ({
+      id: m.worker_id,
+      name: m.users?.name ?? `Рабочий #${m.worker_id}`,
+    }));
+  }
+
   const canTake = isWorker && task.status === "open";
-  const canSubmit = isWorker && task.status === "in_progress" && task.taken_by_id === profile.id;
+  const canSubmit = isWorker && task.status === "in_progress" && isMine;
   const canReview = isForeman && task.status === "review";
+  const canAssign = isForeman && (task.status === "open" || task.status === "in_progress");
+  const canRelease = task.status === "in_progress" && (isForeman || (isWorker && isMine));
+  const canReopen = isForeman && task.status === "done";
 
   return (
     <main className="container">
@@ -79,7 +99,19 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
           canSubmit={canSubmit}
           canReview={canReview}
           canDelete={isForeman}
+          canRelease={canRelease}
+          releaseLabel={isForeman ? "Освободить задачу" : "Отказаться от задачи"}
+          canReopen={canReopen}
         />
+
+        {canAssign && (
+          <>
+            <h2>Исполнитель</h2>
+            <AssignTask taskId={task.id} workers={workers} currentId={task.taken_by_id} />
+          </>
+        )}
+
+        {isForeman && <TaskEditor taskId={task.id} title={task.title} description={task.description} />}
 
         {reports.length > 0 && (
           <>

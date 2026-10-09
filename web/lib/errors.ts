@@ -6,8 +6,10 @@ const MAP: Record<string, string> = {
   "title required": "Введите название задачи (минимум 2 символа).",
   "profile required": "Сначала настройте профиль.",
   "not authenticated": "Сессия истекла. Войдите заново.",
+  "worker not in site": "Этот рабочий не добавлен на объект.",
 };
 
 export function explain(message: string): string {
+  if (message.includes("value too long")) return "Слишком длинный текст. Сократите название или адрес.";
   return MAP[message] ?? message;
 }
