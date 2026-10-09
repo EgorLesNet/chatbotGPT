@@ -14,19 +14,25 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-/** Downscales a photo to max 1600px and re-encodes it as JPEG so uploads stay small. */
-export async function compressImage(file: File, maxSide = 1600, quality = 0.8): Promise<File> {
+/** Downscales a photo to maxSide px and re-encodes it as JPEG; `square` crops the centre. */
+export async function compressImage(file: File, maxSide = 1600, quality = 0.8, square = false): Promise<File> {
   const img = await loadImage(file);
-  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-  const width = Math.max(1, Math.round(img.naturalWidth * scale));
-  const height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const side = Math.min(img.naturalWidth, img.naturalHeight);
+  const cw = square ? side : img.naturalWidth;
+  const ch = square ? side : img.naturalHeight;
+  const sx = square ? (img.naturalWidth - side) / 2 : 0;
+  const sy = square ? (img.naturalHeight - side) / 2 : 0;
+
+  const scale = Math.min(1, maxSide / Math.max(cw, ch));
+  const width = Math.max(1, Math.round(cw * scale));
+  const height = Math.max(1, Math.round(ch * scale));
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas unavailable");
-  ctx.drawImage(img, 0, 0, width, height);
+  ctx.drawImage(img, sx, sy, cw, ch, 0, 0, width, height);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
   if (!blob) throw new Error("compress failed");
