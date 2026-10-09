@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/profile";
+import PasskeySettings from "@/components/PasskeySettings";
 import SignOut from "./sign-out";
 
 export default async function DashboardPage() {
@@ -15,6 +16,7 @@ export default async function DashboardPage() {
           <Link className="tile" href="/sites">Объекты</Link>
           <Link className="tile" href="/tasks">Задачи</Link>
         </div>
+        <PasskeySettings />
         <SignOut />
       </section>
     </main>
