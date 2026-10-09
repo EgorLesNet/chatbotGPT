@@ -40,3 +40,7 @@ a.row:hover { background: #f8fafc; }
 .invite { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 details.manage { margin-top: 20px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; }
 details.manage summary { cursor: pointer; font-weight: 700; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.photos img { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; display: block; }
+.thumb { position: relative; }
+.thumb-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: rgba(15, 23, 42, .75); color: #fff; font-size: 16px; line-height: 24px; cursor: pointer; }

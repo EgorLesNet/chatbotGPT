@@ -7,6 +7,11 @@ const MAP: Record<string, string> = {
   "profile required": "Сначала настройте профиль.",
   "not authenticated": "Сессия истекла. Войдите заново.",
   "worker not in site": "Этот рабочий не добавлен на объект.",
+  "comment required": "Напишите комментарий к отчёту.",
+  "photo required": "Добавьте хотя бы одно фото.",
+  "too many photos": "Не более 10 фото.",
+  "bad photo path": "Фото не принадлежит этой задаче. Повторите загрузку.",
+  "photo not found": "Фото не загрузилось. Повторите попытку.",
 };
 
 export function explain(message: string): string {

@@ -12,10 +12,20 @@ type TaskRow = {
 };
 type SiteRow = { id: number; name: string; foreman_id: number };
 type NoteRow = { id: number; comment: string; created_at: string };
+type ReportRow = NoteRow & { photos_json: string };
 type MemberRow = { worker_id: number; users: { name: string } | null };
 
 function fmt(value: string): string {
   return new Date(value).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
+}
+
+function parsePhotos(json: string): string[] {
+  try {
+    const value = JSON.parse(json);
+    return Array.isArray(value) ? value.filter((p): p is string => typeof p === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export default async function TaskPage({ params }: { params: { id: string } }) {
@@ -46,11 +56,20 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
 
   const { data: reportData } = await supabase
     .from("task_reports")
-    .select("id, comment, created_at")
+    .select("id, comment, created_at, photos_json")
     .eq("task_id", taskId)
     .order("created_at", { ascending: false })
     .limit(5);
-  const reports = (reportData ?? []) as unknown as NoteRow[];
+  const reports = (reportData ?? []) as unknown as ReportRow[];
+
+  const photoPaths = reports.flatMap((r) => parsePhotos(r.photos_json));
+  const photoUrls: Record<string, string> = {};
+  if (photoPaths.length) {
+    const { data: signed } = await supabase.storage.from("task-photos").createSignedUrls(photoPaths, 3600);
+    for (const item of signed ?? []) {
+      if (item.path && item.signedUrl) photoUrls[item.path] = item.signedUrl;
+    }
+  }
 
   const { data: reviewData } = await supabase
     .from("task_reviews")
@@ -117,9 +136,24 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
           <>
             <h2>Отчёты рабочих</h2>
             <div className="list">
-              {reports.map((r) => (
-                <div key={r.id} className="row"><span className="pre">{r.comment || "Без комментария"}</span><span className="muted">{fmt(r.created_at)}</span></div>
-              ))}
+              {reports.map((r) => {
+                const urls = parsePhotos(r.photos_json).map((p) => photoUrls[p]).filter(Boolean);
+                return (
+                  <div key={r.id} className="row">
+                    <span className="pre">{r.comment || "Без комментария"}</span>
+                    <span className="muted">{fmt(r.created_at)}</span>
+                    {urls.length > 0 && (
+                      <div className="photos">
+                        {urls.map((u) => (
+                          <a key={u} href={u} target="_blank" rel="noreferrer">
+                            <img src={u} alt="Фото отчёта" loading="lazy" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
