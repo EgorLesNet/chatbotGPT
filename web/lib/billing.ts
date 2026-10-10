@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 export const PRICE_RUB = 500;
+export const PERIOD_DAYS = 30;
 const API = "https://api.yookassa.ru/v3";
 
 function authHeader(): string | null {
@@ -24,7 +25,7 @@ export async function createYooPayment(
       amount: { value: `${PRICE_RUB}.00`, currency: "RUB" },
       capture: true,
       confirmation: { type: "redirect", return_url: returnUrl },
-      description: "Доступ к более чем 3 объектам",
+      description: `Подписка прораба на ${PERIOD_DAYS} дней: более 3 объектов`,
       metadata: { user_id: String(userId) },
     }),
     signal: AbortSignal.timeout(8000),
@@ -52,6 +53,7 @@ async function confirmPaid(externalId: string, userId: number, amount: number): 
 }
 
 // Never trust the webhook body: re-read the payment from YooKassa with our own credentials.
+// Safe to call repeatedly: the database extends the subscription only once per payment.
 export async function verifyAndConfirm(externalId: string): Promise<boolean> {
   const auth = authHeader();
   if (!auth || !externalId) return false;

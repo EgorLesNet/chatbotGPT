@@ -23,7 +23,7 @@ const MAP: Record<string, string> = {
   "bad kind": "Неверный тип записи.",
   "telegram already connected": "Telegram уже подключён.",
   "bad amount": "Введите корректную сумму больше нуля.",
-  "payment required": "Бесплатно можно вести 3 объекта. Чтобы создать больше, оплатите доступ — 500 ₽ (раздел «Оплата»).",
+  "payment required": "Бесплатно можно вести 3 объекта. Чтобы создать больше, нужна подписка прораба — 500 ₽ в месяц (раздел «Подписка»).",
 };
 
 export function explain(message: string): string {

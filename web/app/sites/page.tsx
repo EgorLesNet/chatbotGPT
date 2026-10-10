@@ -4,7 +4,12 @@ import { STATUS_KEYS, STATUS_LABEL } from "@/lib/status";
 
 type SiteRow = { id: number; name: string; address: string };
 type TaskRow = { id: number; site_id: number; title: string; status: string };
-type Billing = { sites: number; free_limit: number; price: number; unlocked: boolean };
+type Billing = { sites: number; free_limit: number; price: number; paid_until: string | null; unlocked: boolean };
+
+function formatDate(value: string): string {
+  const hasZone = /[zZ]$|[+-]\d\d:?\d\d$/.test(value);
+  return new Date(hasZone ? value : `${value}Z`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+}
 
 export default async function SitesPage() {
   const { supabase, profile } = await getProfile();
@@ -41,9 +46,15 @@ export default async function SitesPage() {
       <section className="card">
         <h1>Объекты</h1>
         {isForeman && !locked && <Link className="button" href="/sites/new">+ Создать объект</Link>}
-        {isForeman && locked && <Link className="button" href="/billing">🔒 Оплатить {billing?.price} ₽ и создавать больше</Link>}
-        {isForeman && billing && !billing.unlocked && (
-          <p className="muted">Бесплатно: {billing.sites} из {billing.free_limit} объектов.</p>
+        {isForeman && locked && <Link className="button" href="/billing">🔒 Подписка {billing?.price} ₽/мес — больше {billing?.free_limit} объектов</Link>}
+        {isForeman && billing && (
+          billing.unlocked && billing.paid_until ? (
+            <p className="muted">Подписка активна до {formatDate(billing.paid_until)}: объектов без ограничений. <Link className="link-button" href="/billing">Продлить</Link></p>
+          ) : (
+            <p className="muted">
+              Бесплатный тариф: {billing.sites} из {billing.free_limit} объектов. Больше объектов — по подписке {billing.price} ₽ в месяц. <Link className="link-button" href="/billing">Подробнее</Link>
+            </p>
+          )
         )}
         {error && <p className="notice">Ошибка загрузки объектов: {error.message}</p>}
         {!error && !sites.length && (

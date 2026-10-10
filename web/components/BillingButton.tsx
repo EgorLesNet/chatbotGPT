@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { checkPayment, startPayment } from "@/app/biz-actions";
 
-export default function BillingButton({ price }: { price: number }) {
+export default function BillingButton({ price, renew }: { price: number; renew: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +42,9 @@ export default function BillingButton({ price }: { price: number }) {
 
   return (
     <div className="actions">
-      <button type="button" className="button" disabled={busy} onClick={pay}>{busy ? "Подождите…" : `Оплатить ${price} ₽`}</button>
+      <button type="button" className="button" disabled={busy} onClick={pay}>
+        {busy ? "Подождите…" : renew ? `Продлить на 30 дней — ${price} ₽` : `Оформить подписку — ${price} ₽ в месяц`}
+      </button>
       <button type="button" className="button secondary" disabled={busy} onClick={check}>Я уже оплатил — проверить</button>
       {error && <p className="notice">{error}</p>}
     </div>
