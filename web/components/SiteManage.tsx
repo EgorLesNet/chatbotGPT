@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { callRpc } from "@/lib/rpc";
+import { createClient } from "@/lib/supabase/client";
 
 type Props = { siteId: number; name: string; address: string };
 
@@ -12,6 +13,8 @@ export default function SiteManage({ siteId, name: initialName, address: initial
   const [address, setAddress] = useState(initialAddress);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
 
   async function run(fn: string, args: Record<string, unknown>, done: () => void, okText = "") {
     setBusy(true);
@@ -29,6 +32,19 @@ export default function SiteManage({ siteId, name: initialName, address: initial
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     run("update_site", { p_site_id: siteId, p_name: name, p_address: address }, () => router.refresh(), "Сохранено.");
+  }
+
+  async function askDelete() {
+    setMessage("");
+    setConfirming(true);
+    setSubscribed(null);
+    try {
+      const { data } = await createClient().rpc("billing_status");
+      const status = data as { unlocked?: boolean } | null;
+      setSubscribed(Boolean(status?.unlocked));
+    } catch {
+      setSubscribed(null);
+    }
   }
 
   return (
@@ -52,19 +68,35 @@ export default function SiteManage({ siteId, name: initialName, address: initial
         >
           Обновить ссылку-приглашение
         </button>
-        <button
-          type="button"
-          className="button danger"
-          disabled={busy}
-          onClick={() => {
-            if (confirm("Удалить объект со всеми задачами, отчётами и сообщениями? Это необратимо.")) {
-              run("delete_site", { p_site_id: siteId }, () => router.push("/sites"));
-            }
-          }}
-        >
-          Удалить объект
-        </button>
+        {!confirming && (
+          <button type="button" className="button danger" disabled={busy} onClick={askDelete}>
+            Удалить объект
+          </button>
+        )}
       </div>
+      {confirming && (
+        <div className="actions" role="alertdialog" aria-label="Подтверждение удаления">
+          <p className="notice">
+            Удалить объект «{initialName}» вместе со всеми задачами, отчётами, финансами и сообщениями? Это необратимо.
+          </p>
+          {subscribed === false && (
+            <p className="notice">
+              <b>Подписки нет.</b> Место не освободится: чтобы создать новый объект после удаления, потребуется подписка.
+            </p>
+          )}
+          <button
+            type="button"
+            className="button danger"
+            disabled={busy}
+            onClick={() => run("delete_site", { p_site_id: siteId }, () => router.push("/sites"))}
+          >
+            {busy ? "Удаляем…" : "Да, удалить объект"}
+          </button>
+          <button type="button" className="button secondary" disabled={busy} onClick={() => setConfirming(false)}>
+            Отмена
+          </button>
+        </div>
+      )}
       {message && <p className="notice">{message}</p>}
     </details>
   );
