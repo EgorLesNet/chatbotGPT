@@ -9,7 +9,10 @@ export const metadata: Metadata = {
   description: "ProrabTask — контроль, оптимизация, ремонт: управление строительными объектами и задачами",
   applicationName: "ProrabTask",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/logo.jpg", apple: "/logo.jpg" },
+  icons: {
+    icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: { capable: true, statusBarStyle: "default", title: "ProrabTask" },
 };
 
