@@ -3,7 +3,7 @@ const MAP: Record<string, string> = {
   "not found": "Не найдено.",
   "wrong status": "Статус задачи уже изменился. Обновите страницу.",
   "name required": "Введите название (минимум 2 символа).",
-  "title required": "Введите название задачи (минимум 2 символа).",
+  "title required": "Введите название (минимум 2 символа).",
   "profile required": "Сначала настройте профиль.",
   "not authenticated": "Сессия истекла. Войдите заново.",
   "worker not in site": "Этот рабочий не добавлен на объект.",
@@ -20,8 +20,10 @@ const MAP: Record<string, string> = {
   "message required": "Введите сообщение.",
   "message too long": "Сообщение слишком длинное (до 2000 символов).",
   "task not in site": "Задача не относится к этому объекту.",
-  "bad kind": "Неверный тип сообщения.",
+  "bad kind": "Неверный тип записи.",
   "telegram already connected": "Telegram уже подключён.",
+  "bad amount": "Введите корректную сумму больше нуля.",
+  "payment required": "Бесплатно можно вести 3 объекта. Чтобы создать больше, оплатите доступ — 500 ₽ (раздел «Оплата»).",
 };
 
 export function explain(message: string): string {

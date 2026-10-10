@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getProfile } from "@/lib/profile";
 import { STATUS_LABEL } from "@/lib/status";
 import CopyLink from "@/components/CopyLink";
+import ClientLink from "@/components/ClientLink";
 import NewTaskForm from "@/components/NewTaskForm";
 import SiteManage from "@/components/SiteManage";
 import RemoveMember from "@/components/RemoveMember";
@@ -25,6 +26,12 @@ export default async function SitePage({ params }: { params: { id: string } }) {
   const site = siteData as unknown as SiteRow;
   const isForeman = profile.role === "foreman" && site.foreman_id === profile.id;
 
+  let shareToken: string | null = null;
+  if (isForeman) {
+    const { data: shareData } = await supabase.from("sites").select("share_token").eq("id", siteId).maybeSingle();
+    shareToken = (shareData as unknown as { share_token: string | null } | null)?.share_token ?? null;
+  }
+
   const { data: taskData } = await supabase
     .from("tasks")
     .select("id, title, status")
@@ -45,10 +52,17 @@ export default async function SitePage({ params }: { params: { id: string } }) {
         <h1>{site.name}</h1>
         <p className="muted">{site.address}</p>
 
+        <div className="row-actions">
+          <Link className="button small" href={`/sites/${site.id}/chat`}>💬 Чат объекта</Link>
+          {isForeman && <Link className="button small secondary" href={`/sites/${site.id}/finance`}>💰 Финансы и смета</Link>}
+        </div>
+
         {isForeman && (
           <>
             <h2>Приглашение для рабочих</h2>
             <CopyLink path={`/join/${site.invite_code}`} />
+            <h2>Ссылка для заказчика</h2>
+            <ClientLink siteId={site.id} token={shareToken} />
             <SiteManage siteId={site.id} name={site.name} address={site.address} />
           </>
         )}

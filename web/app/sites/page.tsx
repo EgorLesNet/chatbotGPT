@@ -4,6 +4,7 @@ import { STATUS_KEYS, STATUS_LABEL } from "@/lib/status";
 
 type SiteRow = { id: number; name: string; address: string };
 type TaskRow = { id: number; site_id: number; title: string; status: string };
+type Billing = { sites: number; free_limit: number; price: number; unlocked: boolean };
 
 export default async function SitesPage() {
   const { supabase, profile } = await getProfile();
@@ -21,6 +22,13 @@ export default async function SitesPage() {
     .order("created_at", { ascending: false });
   const tasks = (taskData ?? []) as unknown as TaskRow[];
 
+  let billing: Billing | null = null;
+  if (isForeman) {
+    const { data: b } = await supabase.rpc("billing_status");
+    billing = (b as unknown as Billing | null) ?? null;
+  }
+  const locked = !!billing && !billing.unlocked && billing.sites >= billing.free_limit;
+
   const bySite = new Map<number, TaskRow[]>();
   for (const t of tasks) {
     const list = bySite.get(t.site_id) ?? [];
@@ -32,7 +40,11 @@ export default async function SitesPage() {
     <main className="container">
       <section className="card">
         <h1>Объекты</h1>
-        {isForeman && <Link className="button" href="/sites/new">+ Создать объект</Link>}
+        {isForeman && !locked && <Link className="button" href="/sites/new">+ Создать объект</Link>}
+        {isForeman && locked && <Link className="button" href="/billing">🔒 Оплатить {billing?.price} ₽ и создавать больше</Link>}
+        {isForeman && billing && !billing.unlocked && (
+          <p className="muted">Бесплатно: {billing.sites} из {billing.free_limit} объектов.</p>
+        )}
         {error && <p className="notice">Ошибка загрузки объектов: {error.message}</p>}
         {!error && !sites.length && (
           <p className="muted">
