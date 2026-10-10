@@ -2,51 +2,29 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { checkPayment, startPayment } from "@/app/biz-actions";
 
-export default function BillingButton({ price, renew }: { price: number; renew: boolean }) {
+export default function BillingButton({ url, price, renew }: { url: string | null; price: number; renew: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
-  async function pay() {
-    setBusy(true);
-    setError("");
-    try {
-      const res = await startPayment();
-      if (res.error || !res.url) {
-        setError(res.error ?? "Не удалось создать платёж.");
-        setBusy(false);
-        return;
-      }
-      window.location.href = res.url;
-    } catch {
-      setError("Нет связи с сервером. Повторите попытку.");
-      setBusy(false);
-    }
+  if (!url) {
+    return <p className="notice">Оплата ещё не настроена: не задана ссылка на подписку Tribute (TRIBUTE_SUBSCRIPTION_URL).</p>;
   }
 
-  async function check() {
+  function refresh() {
     setBusy(true);
-    setError("");
-    try {
-      const res = await checkPayment();
-      if (res.error) setError(res.error);
-      else if (!res.unlocked) setError("Оплата пока не найдена. Если вы уже заплатили, подождите минуту и проверьте ещё раз.");
-      router.refresh();
-    } catch {
-      setError("Нет связи с сервером. Повторите попытку.");
-    }
-    setBusy(false);
+    router.refresh();
+    setTimeout(() => setBusy(false), 1500);
   }
 
   return (
     <div className="actions">
-      <button type="button" className="button" disabled={busy} onClick={pay}>
-        {busy ? "Подождите…" : renew ? `Продлить на 30 дней — ${price} ₽` : `Оформить подписку — ${price} ₽ в месяц`}
+      <a className="button" href={url} target="_blank" rel="noopener noreferrer">
+        {renew ? `Управлять подпиской в Tribute — ${price} ₽/мес` : `Оформить подписку в Tribute — ${price} ₽/мес`}
+      </a>
+      <button type="button" className="button secondary" disabled={busy} onClick={refresh}>
+        {busy ? "Проверяем…" : "Я оплатил — обновить статус"}
       </button>
-      <button type="button" className="button secondary" disabled={busy} onClick={check}>Я уже оплатил — проверить</button>
-      {error && <p className="notice">{error}</p>}
     </div>
   );
 }
