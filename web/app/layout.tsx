@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import SessionKeeper from "@/components/SessionKeeper";
 import BottomNav from "@/components/BottomNav";
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <SessionKeeper />
         {children}
         <BottomNav />
+        <Analytics />
       </body>
     </html>
   );
