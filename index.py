@@ -1,8 +1,10 @@
 """Bot service entry point for Vercel (FastAPI / ASGI): Telegram webhook + health check."""
+import asyncio
 import logging
+from datetime import datetime, timezone
 
 from aiogram.types import Update
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from sqlalchemy import text
 
 from app_factory import build_bot, build_dispatcher
@@ -16,22 +18,58 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 dp = build_dispatcher(PgStorage())
 
+# Public health data is deliberately coarse: only per-service states, never
+# configuration flags, error class names, queue sizes or any user data.
+OPERATIONAL, DEGRADED, OUTAGE = "operational", "degraded", "outage"
+RECENT_ERROR_SECONDS = 15 * 60
 
-@app.get("/api/health")
-async def health():
-    db = "ok"
+
+async def _check_database() -> str:
     try:
         async with engine.connect() as conn:
-            await conn.execute(text("select 1"))
-    except Exception as exc:  # report only the error class, never secrets
+            await asyncio.wait_for(conn.execute(text("select 1")), timeout=5)
+        return OPERATIONAL
+    except Exception:
         logger.exception("Health check: database error")
-        db = f"error: {type(exc).__name__}"
-    return {
-        "status": "ok",
-        "bot_token_set": bool(BOT_TOKEN),
-        "webhook_secret_set": bool(WEBHOOK_SECRET),
-        "database": db,
-    }
+        return OUTAGE
+
+
+async def _check_telegram() -> str:
+    if not BOT_TOKEN or not WEBHOOK_SECRET:
+        return OUTAGE
+    bot = build_bot()
+    try:
+        info = await asyncio.wait_for(bot.get_webhook_info(), timeout=5)
+        if not info.url:
+            logger.warning("Health check: Telegram webhook is not set")
+            return OUTAGE
+        last_error = info.last_error_date
+        if last_error:
+            if last_error.tzinfo is None:
+                last_error = last_error.replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - last_error).total_seconds()
+            if age < RECENT_ERROR_SECONDS:
+                return DEGRADED
+        return OPERATIONAL
+    except Exception:
+        logger.exception("Health check: Telegram API error")
+        return DEGRADED
+    finally:
+        await bot.session.close()
+
+
+@app.get("/api/health")
+async def health(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    database, telegram = await asyncio.gather(_check_database(), _check_telegram())
+    states = {"api": OPERATIONAL, "database": database, "telegram": telegram}
+    if OUTAGE in states.values():
+        overall = OUTAGE
+    elif DEGRADED in states.values():
+        overall = DEGRADED
+    else:
+        overall = OPERATIONAL
+    return {"status": overall, "services": states}
 
 
 @app.post("/api/webhook")
