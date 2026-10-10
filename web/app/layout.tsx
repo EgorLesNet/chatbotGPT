@@ -5,10 +5,12 @@ import SessionKeeper from "@/components/SessionKeeper";
 import BottomNav from "@/components/BottomNav";
 
 export const metadata: Metadata = {
-  title: "Прораб",
-  description: "Управление строительными объектами и задачами",
+  title: { default: "ProrabTask", template: "%s · ProrabTask" },
+  description: "ProrabTask — контроль, оптимизация, ремонт: управление строительными объектами и задачами",
+  applicationName: "ProrabTask",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Прораб" },
+  icons: { icon: "/logo.jpg", apple: "/logo.jpg" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "ProrabTask" },
 };
 
 export const viewport: Viewport = {

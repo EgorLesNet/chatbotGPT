@@ -67,7 +67,9 @@ export default function LoginPage() {
   return (
     <main className="container narrow">
       <section className="card">
-        <p className="eyebrow">ПРОРАБ</p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.jpg" alt="ProrabTask" width={72} height={72} style={{ borderRadius: 16, marginBottom: 12 }} />
+        <p className="eyebrow">ProrabTask</p>
         <h1>{mode === "login" ? "Вход" : "Регистрация"}</h1>
         {mode === "login" && canPasskey && (
           <div className="actions">

@@ -1,9 +1,12 @@
 {
-  "name": "Прораб",
-  "short_name": "Прораб",
+  "name": "ProrabTask",
+  "short_name": "ProrabTask",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#0f172a",
-  "description": "Управление строительными объектами и задачами"
+  "description": "ProrabTask — контроль, оптимизация, ремонт",
+  "icons": [
+    { "src": "/logo.jpg", "sizes": "500x500", "type": "image/jpeg", "purpose": "any" }
+  ]
 }
